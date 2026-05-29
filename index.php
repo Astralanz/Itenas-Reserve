@@ -28,6 +28,9 @@ if (isset($_GET['ajax_cek_jadwal'])) {
             
             $jam_mulai = date('H:i', strtotime($row['jam_mulai']));
             $jam_selesai = date('H:i', strtotime($row['jam_selesai']));
+            
+            // Tambahkan waktu mulai full biar bisa dicek di JS
+            $waktu_mulai_full = $row['tanggal_pinjam'] . ' ' . $row['jam_mulai'];
             $waktu_selesai_full = $row['tanggal_pinjam'] . ' ' . $row['jam_selesai'];
             
             echo '
@@ -36,7 +39,7 @@ if (isset($_GET['ajax_cek_jadwal'])) {
                 <div class="jadwal-info">
                     <h4>'.htmlspecialchars($row['nama_peminjam']).' - '.htmlspecialchars($row['prodi']).'</h4>
                     <p>Waktu : '.$jam_mulai.' - '.$jam_selesai.'</p>
-                    <p class="sisa-waktu">Sisa Waktu : <span class="countdown" data-end="'.$waktu_selesai_full.'">Loading...</span></p>
+                    <p class="sisa-waktu"><span class="countdown" data-start="'.$waktu_mulai_full.'" data-end="'.$waktu_selesai_full.'">Loading...</span></p>
                 </div>
             </div>';
         }
@@ -121,9 +124,9 @@ $ambil_fasilitas = mysqli_query($conn, $query_string);
             background-color: #7cd95b; 
             color: white; 
             border: none; 
-            border-radius: 20px; /* Disamain dengan border-radius wrapper tombol book */
-            width: 110px;        /* Disamain dengan lebar .btn-book-wrapper */
-            padding: 8px 0;      /* Ditata biar tinggi totalnya sama persis */
+            border-radius: 20px;
+            width: 110px;        
+            padding: 8px 0;      
             font-size: 13px; 
             font-weight: 600; 
             cursor: pointer; 
@@ -189,10 +192,12 @@ $ambil_fasilitas = mysqli_query($conn, $query_string);
                         <div class="card-body">
                             <h3><?php echo htmlspecialchars($data['nama_aset']); ?></h3>
                             
-                            <?php if ($is_booked) { ?>
+                            <?php if ($is_booked) { 
+                                $waktu_mulai_full_dashboard = $tanggal_sekarang . ' ' . $data['jam_mulai_peminjam'];
+                            ?>
                                 <p style="margin-bottom: 4px;"><strong><?php echo htmlspecialchars($data['peminjam']); ?></strong> - <?php echo htmlspecialchars($data['prodi_peminjam']); ?></p>
                                 <p style="margin-bottom: 4px;">Waktu : <?php echo date('H:i', strtotime($data['jam_mulai_peminjam'])); ?> - <?php echo date('H:i', strtotime($data['jam_selesai_peminjam'])); ?></p>
-                                <p class="time-counter">Sisa Waktu : <span class="countdown" data-end="<?php echo $data['waktu_selesai']; ?>">Loading...</span></p>
+                                <p class="time-counter"><span class="countdown" data-start="<?php echo $waktu_mulai_full_dashboard; ?>" data-end="<?php echo $data['waktu_selesai']; ?>">Loading...</span></p>
                             <?php } else { ?>
                                 <p>Hari Ini Kosong nih</p> 
                             <?php } ?>
@@ -269,23 +274,34 @@ $ambil_fasilitas = mysqli_query($conn, $query_string);
             if(timers.length === 0) return; 
 
             timers.forEach(timer => {
+                const startTimeStr = timer.getAttribute('data-start');
                 const endTimeStr = timer.getAttribute('data-end');
-                if (!endTimeStr) return;
+                
+                // Pastikan kedua data atribut tersedia
+                if (!startTimeStr || !endTimeStr) return;
 
+                // Format replace ini untuk mengatasi issue parsing tanggal di beberapa browser (terutama Safari)
+                const startTime = new Date(startTimeStr.replace(/-/g, "/")).getTime();
                 const endTime = new Date(endTimeStr.replace(/-/g, "/")).getTime();
                 const now = new Date().getTime();
-                const selisih = endTime - now;
 
-                if (selisih <= 0) {
+                // 1. Jika belum waktunya mulai (sekarang masih di bawah jam mulai)
+                if (now < startTime) {
+                    timer.innerHTML = "Waktu : Sedang Antri";
+                } 
+                // 2. Jika sudah masuk waktunya mulai, dan belum lewat jam selesai
+                else if (now >= startTime && now <= endTime) {
+                    const selisih = endTime - now;
+                    const jam = Math.floor((selisih / (1000 * 60 * 60)));
+                    const menit = Math.floor((selisih % (1000 * 60 * 60)) / (1000 * 60));
+                    const detik = Math.floor((selisih % (1000 * 60)) / 1000);
+
+                    timer.innerHTML = `Sisa Waktu : ${jam}j ${menit}m ${detik}d`;
+                } 
+                // 3. Jika waktunya sudah kelewat
+                else {
                     timer.innerHTML = "Waktu Habis / Selesai";
-                    return;
                 }
-
-                const jam = Math.floor((selisih / (1000 * 60 * 60)));
-                const menit = Math.floor((selisih % (1000 * 60 * 60)) / (1000 * 60));
-                const detik = Math.floor((selisih % (1000 * 60)) / 1000);
-
-                timer.innerHTML = `${jam}j ${menit}m ${detik}d`;
             });
         }, 1000);
 
