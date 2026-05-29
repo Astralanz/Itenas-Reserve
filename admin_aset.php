@@ -201,14 +201,6 @@ if (isset($_GET['search'])) {
                 <li class="menu-item">
                     <a href="admin_rating.php">⭐ Rating dari user</a>
                 </li>
-                <li class="menu-item">
-                    <a href="https://api.whatsapp.com/send?phone=6285189920482&text=Halo%20Admin%20Itenas%20Reserve.%20Saya%20ingin%20bertanya%20mengenai%20peminjaman." target="_blank" rel="noopener noreferrer">🎧 Customer Service</a>
-                    <div class="sub-menu">
-                        <a href="#">💬 • Chat dengan user 1</a>
-                        <a href="#">💬 • Chat dengan user 2</a>
-                        <a href="#">💬 • Chat dengan user 3</a>
-                    </div>
-                </li>
             </ul>
         </div>
     </div>
