@@ -5,8 +5,8 @@ include 'koneksi.php';
 // Atur timezone
 date_default_timezone_set('Asia/Jakarta');
 
-// Proteksi halaman admin
-if (!isset($_SESSION['user_id'])) {
+// Proteksi halaman admin + Cek Role (Biar mhs ga bisa tembus lewat URL)
+if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
     header("Location: login.php");
     exit();
 }
@@ -84,6 +84,7 @@ if (isset($_GET['search'])) {
         .sidebar-menu { 
             background-color: #ff1a73; border-radius: 20px; padding: 30px 15px; 
             flex: 1; color: white; box-shadow: 0 10px 20px rgba(255, 26, 115, 0.2);
+            display: flex; flex-direction: column; justify-content: space-between; /* Menjaga posisi logout tetap di bawah */
             overflow-y: auto;
         }
         .menu-list { list-style: none; display: flex; flex-direction: column; gap: 10px; }
@@ -200,6 +201,14 @@ if (isset($_GET['search'])) {
                 </li>
                 <li class="menu-item">
                     <a href="admin_rating.php">⭐ Rating dari user</a>
+                </li>
+            </ul>
+
+            <ul class="menu-list" style="margin-top: auto; border-top: 1px solid rgba(255,255,255,0.2); padding-top: 15px;">
+                <li class="menu-item">
+                    <a href="logout.php" onclick="return confirm('Yakin ingin keluar dari panel admin?');" style="color: #ffe6e6;">
+                        🚪 Logout
+                    </a>
                 </li>
             </ul>
         </div>
