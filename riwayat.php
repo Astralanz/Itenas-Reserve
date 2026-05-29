@@ -33,6 +33,13 @@ $query_waiting = mysqli_query($conn, "SELECT peminjaman.*, aset.nama_aset
                                       FROM peminjaman 
                                       JOIN aset ON peminjaman.aset_id = aset.id 
                                       ORDER BY peminjaman.id DESC");
+
+$reasons_file = __DIR__ . '/reject_reasons.json';
+$reject_reasons = [];
+if (file_exists($reasons_file)) {
+    $contents = file_get_contents($reasons_file);
+    $reject_reasons = json_decode($contents, true) ?: [];
+}
 ?>
 
 <!DOCTYPE html>
@@ -177,6 +184,9 @@ $query_waiting = mysqli_query($conn, "SELECT peminjaman.*, aset.nama_aset
                         </div>
                         <div class="col-status <?php echo $status_class; ?>">
                             <?php echo $status_text; ?>
+                            <?php if ($status_db == 'REJECTED') { ?>
+                                <div style="font-size:13px; color:#555; margin-top:6px; font-style:normal;">Alasan: <?php echo htmlspecialchars($reject_reasons[$row['id']] ?? 'Tidak ada alasan tertulis.'); ?></div>
+                            <?php } ?>
                         </div>
                         <div>
                             <?php if ($status_db == 'PENDING') { ?>
