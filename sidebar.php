@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 <?php
 // Ambil email user (karena file ini di-include, session_start() udah dipanggil di file utama)
 $email_user = $_SESSION['email'];
