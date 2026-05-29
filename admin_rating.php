@@ -125,14 +125,6 @@ $query_rating = mysqli_query($conn, "SELECT * FROM rating ORDER BY id DESC");
                 <li class="menu-item active">
                     <a href="admin_rating.php">⭐ Rating dari user</a>
                 </li>
-                <li class="menu-item">
-                    <a href="#">🎧 Customer Service</a>
-                    <div class="sub-menu">
-                        <a href="#">💬 • Chat dengan user 1</a>
-                        <a href="#">💬 • Chat dengan user 2</a>
-                        <a href="#">💬 • Chat dengan user 3</a>
-                    </div>
-                </li>
             </ul>
         </div>
     </div>
