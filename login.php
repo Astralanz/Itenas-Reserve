@@ -2,9 +2,13 @@
 session_start();
 include 'koneksi.php';
 
-// Kalo user udah login, lempar ke index
+// Kalo udah login, lempar ke halaman masing-masing sesuai role
 if (isset($_SESSION['user_id'])) {
-    header("Location: index.php");
+    if ($_SESSION['role'] == 'admin') {
+        header("Location: admin_aset.php");
+    } else {
+        header("Location: index.php");
+    }
     exit();
 }
 
@@ -15,28 +19,57 @@ if (isset($_POST['credential'])) {
     $payload = json_decode(base64_decode($token_parts[1]), true);
     
     $email = $payload['email'];
-    $nama_google = $payload['name']; // TANGKAP NAMA GOOGLE DISINI (Contoh: 152024078 • mhs.itenas.ac.id)
+    $nama_google = $payload['name']; // TANGKAP NAMA GOOGLE DISINI
 
-    // FILTER KHUSUS: Wajib @mhs.itenas.ac.id
-    if (strpos($email, '@mhs.itenas.ac.id') !== false) {
-        $cek_user = mysqli_query($conn, "SELECT * FROM users WHERE email = '$email'");
+    // 1. CARI EMAILNYA DI DATABASE DULU
+    $cek_user = mysqli_query($conn, "SELECT * FROM users WHERE email = '$email'");
+    
+    if (mysqli_num_rows($cek_user) > 0) {
+        $data_user = mysqli_fetch_array($cek_user);
         
-        if (mysqli_num_rows($cek_user) > 0) {
-            $data_user = mysqli_fetch_array($cek_user);
+        // JIKA DIA ADMIN: Langsung lempar ke admin_aset.php
+        if ($data_user['role'] == 'admin') {
             $_SESSION['user_id'] = $data_user['id'];
             $_SESSION['email']   = $data_user['email'];
-            $_SESSION['role']    = $data_user['role'];
-            $_SESSION['nama_google'] = $nama_google; // Simpan ke session biar bisa dipake di halaman lain
-        } else {
+            $_SESSION['role']    = 'admin';
+            $_SESSION['nama_google'] = $nama_google; 
+            
+            echo "<script>alert('Login Admin Berhasil! Selamat Datang Admin.'); window.location.href='admin_aset.php';</script>";
+            exit();
+        } 
+        // JIKA DIA USER BIASA: Pastikan domainnya @mhs.itenas.ac.id dan lempar ke index.php
+        else {
+            if (strpos($email, '@mhs.itenas.ac.id') !== false) {
+                $_SESSION['user_id'] = $data_user['id'];
+                $_SESSION['email']   = $data_user['email'];
+                $_SESSION['role']    = $data_user['role'];
+                $_SESSION['nama_google'] = $nama_google;
+                
+                echo "<script>alert('Login Berhasil, Selamat Datang Mahasiswa Itenas!'); window.location.href='index.php';</script>";
+                exit();
+            } else {
+                echo "<script>alert('❌ Akses Ditolak! Wajib menggunakan email @mhs.itenas.ac.id'); window.location.href='login.php';</script>";
+                exit();
+            }
+        }
+    } 
+    // 2. JIKA EMAIL BELUM TERDAFTAR DI DATABASE (Pendaftar Baru)
+    else {
+        // Karena admin harus didaftarkan manual, berarti pendaftar baru otomatis adalah Mahasiswa
+        if (strpos($email, '@mhs.itenas.ac.id') !== false) {
             mysqli_query($conn, "INSERT INTO users (email, role) VALUES ('$email', 'user')");
+            
             $_SESSION['user_id'] = mysqli_insert_id($conn);
             $_SESSION['email']   = $email;
             $_SESSION['role']    = 'user';
-            $_SESSION['nama_google'] = $nama_google; // Simpan ke session untuk user baru
+            $_SESSION['nama_google'] = $nama_google;
+            
+            echo "<script>alert('Login Berhasil, Selamat Datang Mahasiswa Itenas!'); window.location.href='index.php';</script>";
+            exit();
+        } else {
+            echo "<script>alert('❌ Akses Ditolak! Akun tidak terdaftar atau wajib menggunakan email @mhs.itenas.ac.id'); window.location.href='login.php';</script>";
+            exit();
         }
-        echo "<script>alert('Login Berhasil, Selamat Datang Mahasiswa Itenas!'); window.location.href='index.php';</script>";
-    } else {
-        echo "<script>alert('❌ Akses Ditolak! Wajib menggunakan email @mhs.itenas.ac.id'); window.location.href='login.php';</script>";
     }
 }
 
@@ -61,7 +94,6 @@ $jumlah_aset = mysqli_fetch_array($hitung_aset);
             font-family: 'Poppins', sans-serif;
         }
         body {
-            /* Warna biru background luar */
             background-color: #4a6fdc; 
             height: 100vh;
             margin: 0;
@@ -71,7 +103,6 @@ $jumlah_aset = mysqli_fetch_array($hitung_aset);
         }
         .main-container {
             background-color: #fcf9f2; 
-            /* Dikunci mati pakai pixel dari revisi lu */
             width: 1500px; 
             height: 700px; 
             border-radius: 35px;
@@ -80,7 +111,6 @@ $jumlah_aset = mysqli_fetch_array($hitung_aset);
             box-shadow: 0 20px 50px rgba(0,0,0,0.2);
         }
         
-        /* BAGIAN KIRI */
         .left-side {
             flex: 1;
             display: flex;
@@ -109,9 +139,8 @@ $jumlah_aset = mysqli_fetch_array($hitung_aset);
             left: -15px; 
         }
 
-        /* WADAH TOMBOL GOOGLE: Mengikuti koordinat input lu sebelumnya */
         .google-btn-wrapper {
-            width: max-content; /* KUNCI UTAMA: Biar bungkusnya nge-press pas sama tombol */
+            width: max-content;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -119,7 +148,7 @@ $jumlah_aset = mysqli_fetch_array($hitung_aset);
             top: -30px;
             left: -15px;
 
-            padding: 3px; /* Ketebalan border */
+            padding: 3px;
             background: linear-gradient(to right, #4169e1, #ffa3ff);
             border-radius: 35px;
             z-index: 1;
@@ -146,7 +175,6 @@ $jumlah_aset = mysqli_fetch_array($hitung_aset);
             left: -15px; 
         }
 
-        /* BAGIAN KANAN (GAMBAR GEDUNG) */
         .right-side {
             flex: 1.8;
             border-radius: 35px;
@@ -168,7 +196,6 @@ $jumlah_aset = mysqli_fetch_array($hitung_aset);
             opacity: 0.9;
         }
 
-        /* CARD KACA (GLASSMORPHISM) */
         .glass-card {
             position: absolute;
             bottom: 20px;
