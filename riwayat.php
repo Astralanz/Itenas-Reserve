@@ -11,16 +11,8 @@ if (!isset($_SESSION['user_id'])) {
     exit();
 }
 
+// Variabel ini disiapin di sini biar sidebar.php bisa langsung pake
 $email_user = $_SESSION['email'];
-$nama_user = explode('@', $email_user)[0]; 
-
-// --- KODE PENARIK NIM DARI GOOGLE SSO ---
-$nama_google = isset($_SESSION['nama_google']) ? $_SESSION['nama_google'] : '';
-$nim_user = explode(' ', $nama_google)[0]; 
-if (empty($nim_user)) {
-    $nim_user = "Mahasiswa Itenas"; // Buat jaga-jaga kalo session kosong
-}
-// ----------------------------------------
 
 // --- LOGIKA TOMBOL BATALKAN ---
 if (isset($_POST['batalkan_peminjaman'])) {
@@ -53,56 +45,72 @@ $query_waiting = mysqli_query($conn, "SELECT peminjaman.*, aset.nama_aset
     <style>
         * { box-sizing: border-box; font-family: 'Poppins', sans-serif; margin: 0; padding: 0; }
         body { background-color: #eef2fc; height: 100vh; display: flex; overflow: hidden; padding: 20px; }
+        
+        /* --- SIDEBAR LEFT (Layout Dasar) --- */
         .sidebar { width: 320px; background-color: #dce4f7; border-radius: 30px; padding: 30px 20px; display: flex; flex-direction: column; justify-content: space-between; }
         .profile-section { display: flex; align-items: center; gap: 15px; margin-bottom: 40px; padding-left: 10px; }
-        .avatar-box { width: 60px; height: 60px; border-radius: 50%; background: url('https://cdn-icons-png.flaticon.com/512/3135/3135715.png') center/cover; border: 3px solid white; }
-        .profile-info h3 { font-size: 18px; font-weight: 700; color: #1a1a1a; text-transform: capitalize; }
+        
+        /* CLASS AVATAR SAMA KAYA INDEX (Aman dari error) */
+        .avatar-box { 
+            width: 60px; 
+            height: 60px; 
+            border-radius: 50%; 
+            flex-shrink: 0; 
+            background-size: cover; 
+            background-position: center; 
+            background-repeat: no-repeat; 
+            border: 3px solid white; 
+            cursor: pointer; 
+            transition: 0.2s; 
+            margin-top: -5px; 
+        }
+        .avatar-box:hover { transform: scale(1.05); box-shadow: 0 5px 15px rgba(74, 111, 220, 0.2); }
+        .profile-info h3 { font-size: 16px; font-weight: 700; color: #1a1a1a; text-transform: capitalize; }
         .profile-info p { font-size: 12px; color: #666; }
         .menu-list { list-style: none; display: flex; flex-direction: column; gap: 12px; flex-grow: 1; }
         .menu-item a { display: flex; align-items: center; gap: 15px; padding: 15px 25px; color: #555; text-decoration: none; font-weight: 500; font-size: 14px; border-radius: 20px; transition: 0.3s; }
         .menu-item.active a { background-color: #4a6fdc; color: white; box-shadow: 0 10px 20px rgba(74, 111, 220, 0.3); }
         .menu-item:not(.active) a:hover { background-color: rgba(255, 255, 255, 0.5); color: #000; }
+        
+        /* --- MAIN KONTEN RIGHT --- */
         .main-content { flex: 1; padding: 10px 40px; display: flex; flex-direction: column; overflow-y: auto; }
         .main-header { text-align: center; font-size: 32px; font-weight: 700; color: #4a6fdc; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 40px; text-shadow: 0 4px 10px rgba(74, 111, 220, 0.1); }
+        
+        /* --- WAITING LIST TABLE CSS --- */
         .waiting-table-container { width: 100%; display: flex; flex-direction: column; gap: 15px; }
         .table-header-row { display: grid; grid-template-columns: 0.5fr 1.5fr 2fr 1.5fr 1.2fr; padding: 15px 30px; background-color: #dce4f7; border-radius: 20px; color: #555; font-weight: 600; font-size: 14px; text-align: left; align-items: center; }
         .table-data-row { display: grid; grid-template-columns: 0.5fr 1.5fr 2fr 1.5fr 1.2fr; padding: 20px 30px; background-color: white; border-radius: 20px; box-shadow: 0 8px 20px rgba(0,0,0,0.02); align-items: center; font-size: 14px; color: #333; }
         .col-schedule { font-size: 13px; color: #555; line-height: 1.4; }
         .col-status { font-weight: 500; font-style: italic; }
-        
         .status-pending { color: #555; }
         .status-approved { color: #16a34a; font-weight: 600; }
         .status-rejected { color: #dc2626; }
-        
         .btn-action { border: none; padding: 10px 0; border-radius: 15px; font-size: 13px; font-weight: 600; color: white; cursor: pointer; width: 120px; text-align: center; display: block; transition: 0.2s; }
         .btn-red { background-color: #e50000; box-shadow: 0 4px 12px rgba(229, 0, 0, 0.2); }
         .btn-red:hover { background-color: #b80000; }
         .btn-orange { background-color: #ff9100; box-shadow: 0 4px 12px rgba(255, 145, 0, 0.2); }
         .btn-orange:hover { background-color: #d47800; }
+
+        /* --- STYLING MODAL PROFIL USER --- */
+        .modal-profil-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 1000; justify-content: center; align-items: center; backdrop-filter: blur(3px); }
+        .modal-profil-box { background: white; width: 450px; padding: 40px; border-radius: 20px; box-shadow: 0 15px 30px rgba(0,0,0,0.15); text-align: center; position: relative; }
+        .edit-avatar-container { position: relative; width: 120px; height: 120px; margin: 0 auto 20px; }
+        .edit-avatar-preview { width: 100%; height: 100%; border-radius: 50%; object-fit: cover; border: 4px solid #4a6fdc; cursor: pointer; }
+        .edit-icon { position: absolute; bottom: 0; right: 0; background: white; width: 35px; height: 35px; border-radius: 50%; display: flex; justify-content: center; align-items: center; box-shadow: 0 4px 10px rgba(0,0,0,0.1); cursor: pointer; color: #4a6fdc; font-size: 16px; }
+        #upload_profil { display: none; }
+        .modal-profil-name { font-size: 18px; font-weight: 800; color: #000; margin-bottom: 25px; text-transform: uppercase;}
+        .info-row { display: flex; text-align: left; margin-bottom: 15px; font-size: 15px; color: #555; }
+        .info-label { width: 80px; }
+        .info-colon { width: 20px; text-align: center; }
+        .info-value { flex: 1; font-weight: 500; color: #333; }
+        .btn-simpan-wrapper { display: inline-block; padding: 2px; border-radius: 20px; background: linear-gradient(to right, #4169e1, #ffa3ff); margin-top: 15px; }
+        .btn-simpan { background: white; border: none; padding: 8px 30px; border-radius: 18px; color: #a855f7; font-weight: 600; cursor: pointer; transition: 0.2s; font-size: 14px; }
+        .btn-simpan:hover { background: #a855f7; color: white; }
     </style>
 </head>
 <body>
 
-    <div class="sidebar">
-        <div>
-            <div class="profile-section">
-                <div class="avatar-box"></div>
-                <div class="profile-info">
-                    <h3>Hallo <?php echo htmlspecialchars($nama_user); ?></h3>
-                    <p>NIM : <?php echo htmlspecialchars($nim_user); ?></p>
-                </div>
-            </div>
-            <ul class="menu-list">
-                <li class="menu-item"><a href="index.php">📅 Reserve</a></li>
-                <li class="menu-item active"><a href="riwayat.php">⏳ Waiting List</a></li>
-                <li class="menu-item"><a href="rating.php">⭐ Rating and Feedback</a></li>
-                <li class="menu-item"><a href="#">🎧 Customer Service</a></li>
-            </ul>
-        </div>
-        <ul class="menu-list" style="flex-grow: 0;">
-            <li class="menu-item"><a href="logout.php" style="color: #dc2626;">🚪 Logout</a></li>
-        </ul>
-    </div>
+    <?php include 'sidebar.php'; ?>
 
     <div class="main-content">
         <h1 class="main-header">Waiting List</h1>
