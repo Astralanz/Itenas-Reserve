@@ -11,8 +11,11 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
     exit();
 }
 
-// --- AMBIL DATA RATING DARI DATABASE ---
-$query_rating = mysqli_query($conn, "SELECT * FROM rating ORDER BY id DESC");
+// --- AMBIL DATA RATING DARI DATABASE DENGAN JOIN KE TABEL USERS ---
+$query_rating = mysqli_query($conn, "SELECT rating.*, users.foto_profil 
+                                     FROM rating 
+                                     LEFT JOIN users ON rating.email_user = users.email 
+                                     ORDER BY rating.id DESC");
 ?>
 
 <!DOCTYPE html>
@@ -41,7 +44,7 @@ $query_rating = mysqli_query($conn, "SELECT * FROM rating ORDER BY id DESC");
         .sidebar-menu { 
             background-color: #ff1a73; border-radius: 20px; padding: 30px 15px; 
             flex: 1; color: white; box-shadow: 0 10px 20px rgba(255, 26, 115, 0.2);
-            display: flex; flex-direction: column; justify-content: space-between; /* Menjaga posisi logout tetap di bawah */
+            display: flex; flex-direction: column; justify-content: space-between; 
             overflow-y: auto;
         }
         .menu-list { list-style: none; display: flex; flex-direction: column; gap: 10px; }
@@ -51,7 +54,6 @@ $query_rating = mysqli_query($conn, "SELECT * FROM rating ORDER BY id DESC");
             border-radius: 15px; transition: 0.3s;
         }
         
-        /* Menu Aktif dipindah ke Rating */
         .menu-item.active a { background-color: white; color: black; }
         .menu-item:not(.active) a:hover { background-color: rgba(255, 255, 255, 0.1); }
         
@@ -67,40 +69,36 @@ $query_rating = mysqli_query($conn, "SELECT * FROM rating ORDER BY id DESC");
         .rating-container { display: flex; flex-direction: column; flex: 1; overflow: hidden; }
         
         .reviews-list { 
-            flex: 1; overflow-y: auto; background-color: #eef2fc; /* Warna background soft kayak di desain */
+            flex: 1; overflow-y: auto; background-color: #eef2fc; 
             padding: 25px 35px; border-radius: 25px; display: flex; flex-direction: column; 
         }
         
         .review-item { 
             display: flex; gap: 20px; padding-bottom: 20px; padding-top: 20px; 
-            border-bottom: 1.5px solid #ff99c2; /* Garis pemisah warna pink soft */
+            border-bottom: 1.5px solid #ff99c2; 
         }
         .review-item:first-child { padding-top: 0; }
         .review-item:last-child { border-bottom: none; padding-bottom: 0; }
         
+        /* CSS Avatar diubah biar siap nerima gambar dari database */
         .review-avatar { 
             width: 55px; height: 55px; border-radius: 50%; 
-            background: url('https://cdn-icons-png.flaticon.com/512/3135/3135715.png') center/cover; 
+            background-size: cover; 
+            background-position: center; 
             border: 3px solid #4a6fdc; flex-shrink: 0; 
         }
         
         .review-content { flex: 1; display: flex; flex-direction: column; }
-        
-        /* Nama user warna Magenta sesuai desain */
         .review-content h4 { font-size: 15px; font-weight: 700; color: #ff1a73; margin-bottom: 2px; }
         .review-content p { font-size: 14px; color: #555; line-height: 1.5; margin-bottom: 5px; flex-grow: 1; }
         
-        /* KELOMPOK BAWAH REVIEW (Bintang & Tanggal) */
         .review-bottom-bar { display: flex; justify-content: space-between; align-items: flex-end; margin-top: 5px; }
         
-        /* Bintang warna Magenta */
         .stars-display { color: #ff1a73; font-size: 17px; letter-spacing: 2px; margin-bottom: 2px; }
-        .stars-display .empty { color: #f0a8c4; } /* Warna bintang kosong disesuaikan biar blend sama pink */
+        .stars-display .empty { color: #f0a8c4; } 
         
-        /* Styling Tanggal */
         .review-date { font-size: 13px; color: #777; font-style: italic; }
 
-        /* Custom Scrollbar */
         ::-webkit-scrollbar { width: 8px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #ff99c2; border-radius: 10px; }
@@ -146,11 +144,17 @@ $query_rating = mysqli_query($conn, "SELECT * FROM rating ORDER BY id DESC");
                 <?php 
                 if (mysqli_num_rows($query_rating) > 0) {
                     while ($row = mysqli_fetch_array($query_rating)) {
-                        // Format tanggal jadi dd-mm-yyyy sesuai desain lu
                         $tanggal_format = date('d-m-Y', strtotime($row['tanggal']));
+                        
+                        // LOGIKA UNTUK MENAMPILKAN FOTO PROFIL
+                        $foto_review = $row['foto_profil'];
+                        // Cek apakah foto ada dan file-nya beneran eksis di folder uploads
+                        $path_foto_review = (!empty($foto_review) && file_exists('uploads/' . $foto_review)) 
+                                            ? 'uploads/' . $foto_review 
+                                            : 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png';
                 ?>
                 <div class="review-item">
-                    <div class="review-avatar"></div>
+                    <div class="review-avatar" style="background-image: url('<?php echo $path_foto_review; ?>');"></div>
                     <div class="review-content">
                         <h4><?php echo htmlspecialchars($row['nama_user']); ?></h4>
                         <p><?php echo nl2br(htmlspecialchars($row['komentar'])); ?></p>
