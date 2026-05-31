@@ -11,17 +11,37 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
     exit();
 }
 
+$show_reject_form = false;
+$reject_data = null;
+
 // --- LOGIKA ACC & TOLAK PEMINJAMAN ---
-if (isset($_GET['aksi']) && isset($_GET['id_pinjam'])) {
+$reasons_file = __DIR__ . '/reject_reasons.json';
+$reject_reasons = [];
+if (file_exists($reasons_file)) {
+    $contents = file_get_contents($reasons_file);
+    $reject_reasons = json_decode($contents, true) ?: [];
+}
+
+if (isset($_POST['tolak_submit'])) {
+    $id_pinjam = mysqli_real_escape_string($conn, $_POST['id_pinjam']);
+    $alasan_tolak = trim($_POST['alasan_tolak']);
+    mysqli_query($conn, "UPDATE peminjaman SET status = 'REJECTED' WHERE id = '$id_pinjam'");
+    $reject_reasons[$id_pinjam] = $alasan_tolak;
+    file_put_contents($reasons_file, json_encode($reject_reasons, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+    echo "<script>alert('Permohonan telah DITOLAK dengan alasan!'); window.location.href='admin_antrian.php';</script>";
+    exit();
+} elseif (isset($_GET['aksi']) && isset($_GET['id_pinjam'])) {
     $id_pinjam = mysqli_real_escape_string($conn, $_GET['id_pinjam']);
     $aksi = $_GET['aksi'];
 
     if ($aksi == 'acc') {
         mysqli_query($conn, "UPDATE peminjaman SET status = 'APPROVED' WHERE id = '$id_pinjam'");
         echo "<script>alert('Permohonan berhasil di-ACC!'); window.location.href='admin_antrian.php';</script>";
+        exit();
     } elseif ($aksi == 'tolak') {
-        mysqli_query($conn, "UPDATE peminjaman SET status = 'REJECTED' WHERE id = '$id_pinjam'");
-        echo "<script>alert('Permohonan telah DITOLAK!'); window.location.href='admin_antrian.php';</script>";
+        $show_reject_form = true;
+        $result = mysqli_query($conn, "SELECT p.*, a.nama_aset FROM peminjaman p JOIN aset a ON p.aset_id = a.id WHERE p.id = '$id_pinjam' LIMIT 1");
+        $reject_data = mysqli_fetch_assoc($result);
     }
 }
 ?>
@@ -112,6 +132,15 @@ if (isset($_GET['aksi']) && isset($_GET['id_pinjam'])) {
         .btn-tolak { background-color: #ff1a73; color: white; border: none; padding: 6px 20px; border-radius: 20px; font-weight: 700; font-size: 12px; cursor: pointer; text-decoration: none; width: 80px; transition: 0.2s;}
         .btn-tolak:hover { background: #e6005c; }
         
+        .reject-form { background: white; padding: 25px; border-radius: 20px; border: 1px solid rgba(255, 26, 115, 0.15); margin-bottom: 25px; box-shadow: 0 10px 25px rgba(255, 26, 115, 0.08); }
+        .reject-form h3 { margin-bottom: 15px; color: #ff1a73; font-size: 20px; }
+        .reject-form textarea { width: 100%; min-height: 120px; border-radius: 15px; border: 1px solid #ddd; padding: 15px; resize: vertical; font-size: 14px; font-family: 'Poppins', sans-serif; margin-bottom: 15px; }
+        .reject-form textarea:focus { outline: none; border-color: #ff1a73; box-shadow: 0 0 0 4px rgba(255, 26, 115, 0.08); }
+        .reject-form .btn-submit { background-color: #ff1a73; color: white; border: none; padding: 12px 25px; border-radius: 18px; font-weight: 700; cursor: pointer; margin-right: 12px; }
+        .reject-form .btn-cancel { display: inline-block; color: #ff1a73; text-decoration: none; font-weight: 700; padding: 12px 25px; border-radius: 18px; border: 1px solid #ff1a73; }
+        .reject-form .btn-submit:hover { background: #e6005c; }
+        .reject-form .btn-cancel:hover { background: rgba(255, 26, 115, 0.08); }
+        
         .sudah-diproses { font-style: italic; color: #777; font-size: 13px; }
 
         /* Custom Scrollbar */
@@ -155,6 +184,19 @@ if (isset($_GET['aksi']) && isset($_GET['id_pinjam'])) {
     <div class="main-content">
         <h1 class="page-title">Antrian Permohonan</h1>
 
+        <?php if ($show_reject_form && $reject_data) { ?>
+            <div class="reject-form">
+                <h3>Tolak Permohonan</h3>
+                <p style="margin-bottom: 15px; color: #444;">Silakan isi alasan penolakan untuk permohonan <strong><?php echo htmlspecialchars($reject_data['nama_aset']); ?></strong> oleh <strong><?php echo htmlspecialchars($reject_data['nama_peminjam']); ?></strong>.</p>
+                <form method="POST">
+                    <input type="hidden" name="id_pinjam" value="<?php echo $reject_data['id']; ?>">
+                    <textarea name="alasan_tolak" placeholder="Contoh: Waktu tidak tersedia, fasilitas sedang dalam perbaikan, atau peserta melebihi kapasitas" required><?php echo htmlspecialchars($reject_reasons[$reject_data['id']] ?? ''); ?></textarea>
+                    <button type="submit" name="tolak_submit" class="btn-submit">Kirim Penolakan</button>
+                    <a href="admin_antrian.php" class="btn-cancel">Batal</a>
+                </form>
+            </div>
+        <?php } ?>
+
         <div class="table-container">
             <table>
                 <thead>
@@ -166,6 +208,7 @@ if (isset($_GET['aksi']) && isset($_GET['id_pinjam'])) {
                         <th>ASET</th>
                         <th>Jadwal Reservasi</th>
                         <th>STATUS</th>
+                        <th>ALASAN</th>
                         <th>PERSETUJUAN</th>
                     </tr>
                 </thead>
@@ -235,6 +278,13 @@ if (isset($_GET['aksi']) && isset($_GET['id_pinjam'])) {
                         <td class="col-status" style="color: <?php echo $status_color; ?>;">
                             <?php echo $status_text; ?>
                         </td>
+                        <td style="font-size:13px; color:#444; line-height:1.4; text-align:left;">
+                            <?php if ($status_db == 'REJECTED') {
+                                echo htmlspecialchars($reject_reasons[$data['id']] ?? 'Tidak ada alasan tertulis.');
+                            } else {
+                                echo '-';
+                            } ?>
+                        </td>
                         <td>
                             <?php if ($status_db == 'PENDING') { ?>
                                 <div class="action-buttons">
@@ -249,7 +299,7 @@ if (isset($_GET['aksi']) && isset($_GET['id_pinjam'])) {
                     <?php 
                         }
                     } else {
-                        echo "<tr><td colspan='8' style='padding: 30px; color:#888; font-style:italic;'>Belum ada antrian permohonan peminjaman.</td></tr>";
+                        echo "<tr><td colspan='9' style='padding: 30px; color:#888; font-style:italic;'>Belum ada antrian permohonan peminjaman.</td></tr>";
                     }
                     ?>
                 </tbody>
