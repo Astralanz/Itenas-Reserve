@@ -11,6 +11,18 @@ if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
     exit();
 }
 
+// --- LOGIKA HAPUS SEMUA RIWAYAT LAMA ---
+if (isset($_GET['aksi']) && $_GET['aksi'] == 'hapus_riwayat') {
+    $hapus = mysqli_query($conn, "DELETE FROM peminjaman WHERE status IN ('SELESAI', 'REJECTED', 'DITOLAK')");
+    
+    if ($hapus) {
+        echo "<script>alert('Mantap bos! Semua riwayat lama berhasil disapu bersih.'); window.location.href='admin_antrian.php';</script>";
+    } else {
+        echo "<script>alert('Gagal menghapus riwayat!'); window.location.href='admin_antrian.php';</script>";
+    }
+    exit();
+}
+
 $show_reject_form = false;
 $reject_data = null;
 
@@ -72,7 +84,7 @@ if (isset($_POST['tolak_submit'])) {
         .sidebar-menu { 
             background-color: #ff1a73; border-radius: 20px; padding: 30px 15px; 
             flex: 1; color: white; box-shadow: 0 10px 20px rgba(255, 26, 115, 0.2);
-            display: flex; flex-direction: column; justify-content: space-between; /* Menjaga posisi logout tetap di bawah */
+            display: flex; flex-direction: column; justify-content: space-between;
             overflow-y: auto;
         }
         .menu-list { list-style: none; display: flex; flex-direction: column; gap: 10px; }
@@ -86,46 +98,43 @@ if (isset($_POST['tolak_submit'])) {
         .menu-item.active a { background-color: white; color: black; }
         .menu-item:not(.active) a:hover { background-color: rgba(255, 255, 255, 0.1); }
         
-        .sub-menu { margin-left: 45px; margin-top: 5px; display: flex; flex-direction: column; gap: 8px; }
-        .sub-menu a { color: white; text-decoration: none; font-size: 13px; font-style: italic; opacity: 0.9; }
-        .sub-menu a:hover { opacity: 1; text-decoration: underline; }
-
         /* --- MAIN CONTENT --- */
         .main-content { flex: 1; display: flex; flex-direction: column; padding: 10px 20px; overflow: hidden; }
-        .page-title { text-align: center; color: #ff1a73; font-size: 32px; font-weight: 800; text-transform: capitalize; margin-bottom: 30px; letter-spacing: 1px; }
+        
+        /* CSS UNTUK HEADER DAN TOMBOL HAPUS (DIUPDATE BIAR GAK GESER) */
+        .header-action { 
+            display: flex; justify-content: center; align-items: center; 
+            margin-bottom: 30px; position: relative; width: 100%;
+        }
+        .page-title { 
+            color: #ff1a73; font-size: 32px; font-weight: 800; text-transform: capitalize; 
+            letter-spacing: 1px; margin: 0; text-align: center;
+        }
+        .btn-hapus-all {
+            position: absolute; right: 10px; /* Bikin tombolnya ngambang di pojok kanan */
+            background-color: #ff4d4d; color: white; padding: 10px 20px; border-radius: 12px;
+            text-decoration: none; font-weight: 600; font-size: 14px; box-shadow: 0 4px 10px rgba(255, 77, 77, 0.3);
+            transition: 0.2s; display: flex; align-items: center; gap: 8px;
+        }
+        .btn-hapus-all:hover { background-color: #cc0000; transform: translateY(-2px); }
 
         /* --- STYLING TABEL ANTRIAN --- */
-        .table-container { 
-            flex: 1; overflow-y: auto; padding-right: 10px; 
-        }
+        .table-container { flex: 1; overflow-y: auto; padding-right: 10px; }
         
-        table { 
-            width: 100%; border-collapse: separate; border-spacing: 0 15px; 
-            text-align: center; margin-top: -15px;
-        }
-        
+        table { width: 100%; border-collapse: separate; border-spacing: 0 15px; text-align: center; margin-top: -15px; }
         thead { position: sticky; top: 0; z-index: 10; }
-        
-        th { 
-            background-color: #ff1a73; color: white; font-weight: 600; 
-            font-size: 14px; padding: 18px 10px; 
-        }
+        th { background-color: #ff1a73; color: white; font-weight: 600; font-size: 14px; padding: 18px 10px; }
         th:first-child { border-top-left-radius: 15px; border-bottom-left-radius: 15px; }
         th:last-child { border-top-right-radius: 15px; border-bottom-right-radius: 15px; }
         
-        td { 
-            background-color: #f4f7fb; padding: 15px 10px; 
-            font-size: 14px; color: #333; vertical-align: middle;
-        }
+        td { background-color: #f4f7fb; padding: 15px 10px; font-size: 14px; color: #333; vertical-align: middle; }
         td:first-child { border-top-left-radius: 15px; border-bottom-left-radius: 15px; font-weight: 600; }
         td:last-child { border-top-right-radius: 15px; border-bottom-right-radius: 15px; }
 
-        /* Detail Kolom */
         .col-mahasiswa { text-align: left; line-height: 1.4; }
         .col-jadwal { font-size: 13px; line-height: 1.4; color: #555; }
         .col-status { font-weight: 700; text-transform: uppercase; font-size: 13px; }
         
-        /* Tombol Aksi */
         .action-buttons { display: flex; flex-direction: column; gap: 8px; align-items: center; justify-content: center; }
         .btn-acc { background-color: #7dd3fc; color: white; border: none; padding: 6px 20px; border-radius: 20px; font-weight: 700; font-size: 12px; cursor: pointer; text-decoration: none; width: 80px; background: #6ede6e; transition: 0.2s;}
         .btn-acc:hover { background: #5bc95b; }
@@ -143,7 +152,6 @@ if (isset($_POST['tolak_submit'])) {
         
         .sudah-diproses { font-style: italic; color: #777; font-size: 13px; }
 
-        /* Custom Scrollbar */
         ::-webkit-scrollbar { width: 8px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #dcb3c3; border-radius: 10px; }
@@ -182,7 +190,12 @@ if (isset($_POST['tolak_submit'])) {
     </div>
 
     <div class="main-content">
-        <h1 class="page-title">Antrian Permohonan</h1>
+        <div class="header-action">
+            <h1 class="page-title">Antrian Permohonan</h1>
+            <a href="admin_antrian.php?aksi=hapus_riwayat" onclick="return confirm('Yakin mau hapus SEMUA riwayat yang udah Selesai & Ditolak? Data gak bisa balik lagi lho bos!');" class="btn-hapus-all">
+                🗑️ Bersihkan Riwayat
+            </a>
+        </div>
 
         <?php if ($show_reject_form && $reject_data) { ?>
             <div class="reject-form">
@@ -214,14 +227,12 @@ if (isset($_POST['tolak_submit'])) {
                 </thead>
                 <tbody>
                     <?php
-                    // Ambil data peminjaman digabung sama data aset
                     $query = mysqli_query($conn, "SELECT p.*, a.nama_aset FROM peminjaman p JOIN aset a ON p.aset_id = a.id ORDER BY p.id DESC");
                     $no = 1;
 
                     if (mysqli_num_rows($query) > 0) {
                         while($data = mysqli_fetch_array($query)) {
                             
-                            // Logika Realtime Status
                             $status_db = strtoupper($data['status']);
                             $waktu_sekarang = time(); 
                             
@@ -231,7 +242,6 @@ if (isset($_POST['tolak_submit'])) {
                             $timestamp_mulai = strtotime($string_mulai);
                             $timestamp_selesai = strtotime($string_selesai);
 
-                            // Auto-update SELESAI di database kalo jamnya udh lewat
                             if (($status_db == 'APPROVED' || $status_db == 'ACC') && $waktu_sekarang > $timestamp_selesai) {
                                 mysqli_query($conn, "UPDATE peminjaman SET status = 'SELESAI' WHERE id = '".$data['id']."'");
                                 $status_db = 'SELESAI'; 
@@ -239,26 +249,25 @@ if (isset($_POST['tolak_submit'])) {
 
                             $is_billing_aktif = ($waktu_sekarang >= $timestamp_mulai && $waktu_sekarang <= $timestamp_selesai);
 
-                            // Pewarnaan Status UI
                             $status_text = "";
                             $status_color = "";
 
                             if ($status_db == 'PENDING') {
                                 $status_text = "PENDING";
-                                $status_color = "#ffb800"; // Kuning/Orange
-                            } elseif ($status_db == 'REJECTED' || $status_db == 'TOLAK') {
+                                $status_color = "#ffb800";
+                            } elseif ($status_db == 'REJECTED' || $status_db == 'DITOLAK') {
                                 $status_text = "DITOLAK";
-                                $status_color = "#ff1a73"; // Merah/Pink
+                                $status_color = "#ff1a73";
                             } elseif ($status_db == 'SELESAI') {
-                                $status_text = "Selesai";
-                                $status_color = "#4a6fdc"; // Biru
+                                $status_text = "SELESAI";
+                                $status_color = "#4a6fdc";
                             } elseif ($status_db == 'APPROVED' || $status_db == 'ACC') {
                                 if ($is_billing_aktif) {
                                     $status_text = "SEDANG DIGUNAKAN";
-                                    $status_color = "#6ede6e"; // Hijau
+                                    $status_color = "#6ede6e";
                                 } else {
                                     $status_text = "DISETUJUI";
-                                    $status_color = "#6ede6e"; // Hijau
+                                    $status_color = "#6ede6e";
                                 }
                             } else {
                                 $status_text = $status_db;
