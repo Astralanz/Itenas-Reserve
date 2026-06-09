@@ -16,36 +16,58 @@ $email_user = $_SESSION['email'];
 $nama_user_login = explode('@', $email_user)[0]; 
 $nama_display = !empty($_SESSION['nama_google']) ? $_SESSION['nama_google'] : $nama_user_login;
 
-// --- LOGIKA HAPUS RATING ---
-if (isset($_POST['hapus_rating'])) {
-    $id_hapus = (int)$_POST['id_rating'];
-    mysqli_query($conn, "DELETE FROM rating WHERE id = '$id_hapus' AND email_user = '$email_user'");
-    echo "<script>alert('Review berhasil dihapus!'); window.location.href='rating.php';</script>";
-}
+// =========================================================================
+// --- LOGIKA AJAX UNTUK RATING (BEKERJA DI BELAKANG LAYAR) ---
+// =========================================================================
+if (isset($_POST['ajax_action'])) {
+    header('Content-Type: application/json');
+    $action = $_POST['ajax_action'];
 
-// --- LOGIKA SIMPAN / UPDATE RATING ---
-if (isset($_POST['kirim_rating'])) {
-    $rating_angka = (int) $_POST['rating_value'];
-    $komentar = mysqli_real_escape_string($conn, $_POST['komentar']);
-    $id_edit = isset($_POST['id_edit']) ? (int)$_POST['id_edit'] : 0;
-
-    if ($rating_angka > 0 && !empty($komentar)) {
-        if ($id_edit > 0) {
-            // PROSES UPDATE
-            $query_update = "UPDATE rating SET rating = '$rating_angka', komentar = '$komentar' WHERE id = '$id_edit' AND email_user = '$email_user'";
-            mysqli_query($conn, $query_update);
-            echo "<script>alert('Review lu berhasil diupdate!'); window.location.href='rating.php';</script>";
+    // 1. AJAX HAPUS RATING
+    if ($action == 'hapus') {
+        $id_hapus = (int)$_POST['id_rating'];
+        $hapus = mysqli_query($conn, "DELETE FROM rating WHERE id = '$id_hapus' AND email_user = '$email_user'");
+        
+        if ($hapus) {
+            echo json_encode(['status' => 'success', 'pesan' => 'Review berhasil dihapus!']);
         } else {
-            // PROSES INSERT BARU
-            $query_insert = "INSERT INTO rating (email_user, nama_user, rating, komentar) 
-                             VALUES ('$email_user', '$nama_display', '$rating_angka', '$komentar')";
-            mysqli_query($conn, $query_insert);
-            echo "<script>alert('Review lu berhasil dikirim! Thanks cuy!'); window.location.href='rating.php';</script>";
+            echo json_encode(['status' => 'error', 'pesan' => 'Gagal menghapus review.']);
         }
-    } else {
-        echo "<script>alert('Pilih bintangnya dan isi komentarnya dulu dong!');</script>";
+        exit();
+    }
+
+    // 2. AJAX SIMPAN / UPDATE RATING
+    if ($action == 'simpan') {
+        $rating_angka = (int) $_POST['rating_value'];
+        $komentar = mysqli_real_escape_string($conn, $_POST['komentar']);
+        $id_edit = isset($_POST['id_edit']) ? (int)$_POST['id_edit'] : 0;
+
+        if ($rating_angka > 0 && !empty($komentar)) {
+            if ($id_edit > 0) {
+                // PROSES UPDATE
+                $query_update = "UPDATE rating SET rating = '$rating_angka', komentar = '$komentar' WHERE id = '$id_edit' AND email_user = '$email_user'";
+                if (mysqli_query($conn, $query_update)) {
+                    echo json_encode(['status' => 'success', 'pesan' => 'Review lu berhasil diupdate!']);
+                } else {
+                    echo json_encode(['status' => 'error', 'pesan' => 'Gagal update review bos.']);
+                }
+            } else {
+                // PROSES INSERT BARU
+                $query_insert = "INSERT INTO rating (email_user, nama_user, rating, komentar) 
+                                 VALUES ('$email_user', '$nama_display', '$rating_angka', '$komentar')";
+                if (mysqli_query($conn, $query_insert)) {
+                    echo json_encode(['status' => 'success', 'pesan' => 'Review lu berhasil dikirim! Thanks cuy!']);
+                } else {
+                    echo json_encode(['status' => 'error', 'pesan' => 'Gagal kirim review bos.']);
+                }
+            }
+        } else {
+            echo json_encode(['status' => 'warning', 'pesan' => 'Pilih bintangnya dan isi komentarnya dulu dong!']);
+        }
+        exit();
     }
 }
+// =========================================================================
 
 // --- AMBIL DATA RATING DARI DATABASE (UDAH PAKE JOIN) ---
 $query_rating = mysqli_query($conn, "SELECT rating.*, users.foto_profil FROM rating LEFT JOIN users ON rating.email_user = users.email ORDER BY rating.id DESC");
@@ -58,6 +80,7 @@ $query_rating = mysqli_query($conn, "SELECT rating.*, users.foto_profil FROM rat
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Rating & Feedback - Itenas Reserve</title>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
         * { box-sizing: border-box; font-family: 'Poppins', sans-serif; margin: 0; padding: 0; }
         body { background-color: #eef2fc; height: 100vh; display: flex; overflow: hidden; padding: 20px; }
@@ -124,8 +147,9 @@ $query_rating = mysqli_query($conn, "SELECT rating.*, users.foto_profil FROM rat
         .interactive-stars span:hover, .interactive-stars span.active { color: #ffb800; }
         .btn-kirim { background-color: #4a6fdc; color: white; border: none; padding: 10px 35px; border-radius: 25px; font-weight: 600; font-size: 13px; cursor: pointer; transition: 0.2s; }
         .btn-kirim:hover { background-color: #3558b8; }
+        .btn-kirim:disabled { background-color: #a0b4ed; cursor: not-allowed; }
         
-        /* --- KEMBALIKAN CSS MODAL YANG HILANG (INI OBAT ANTI SPIDERMAN RAKSASA) --- */
+        /* --- KEMBALIKAN CSS MODAL YANG HILANG --- */
         .modal-profil-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.4); z-index: 1000; justify-content: center; align-items: center; backdrop-filter: blur(3px); }
         .modal-profil-box { background: white; width: 450px; padding: 40px; border-radius: 20px; box-shadow: 0 15px 30px rgba(0,0,0,0.15); text-align: center; position: relative; }
         .edit-avatar-container { position: relative; width: 120px; height: 120px; margin: 0 auto 20px; }
@@ -188,10 +212,7 @@ $query_rating = mysqli_query($conn, "SELECT rating.*, users.foto_profil FROM rat
                                     <span class="dot-menu" onclick="toggleDropdown(event, <?php echo $row['id']; ?>)">&#8942;</span>
                                     
                                     <div class="dropdown-menu" id="dropdown-<?php echo $row['id']; ?>">
-                                        <form action="" method="POST" style="margin:0;">
-                                            <input type="hidden" name="id_rating" value="<?php echo $row['id']; ?>">
-                                            <button type="submit" name="hapus_rating" class="dropdown-item" onclick="return confirm('Yakin mau hapus komentar ini?')">Hapus</button>
-                                        </form>
+                                        <button type="button" class="dropdown-item" onclick="hapusReview(<?php echo $row['id']; ?>)">Hapus</button>
                                         <div class="dropdown-divider"></div>
                                         <button type="button" class="dropdown-item" onclick="editReview(<?php echo $row['id']; ?>, `<?php echo addslashes(htmlspecialchars($row['komentar'])); ?>`, <?php echo $row['rating']; ?>)">Edit</button>
                                     </div>
@@ -213,8 +234,9 @@ $query_rating = mysqli_query($conn, "SELECT rating.*, users.foto_profil FROM rat
             </div>
 
             <div class="input-section">
-                <div class="input-avatar" style="background-image: url('<?php echo $path_foto; ?>');"></div>
-                <form action="" method="POST" class="input-form">
+                <div class="input-avatar" style="background-image: url('<?php echo isset($path_foto) ? $path_foto : 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png'; ?>');"></div>
+                
+                <form id="formRating" class="input-form">
                     <h4><?php echo htmlspecialchars($nama_display); ?></h4>
                     <textarea name="komentar" id="input_komentar" placeholder="Ketik Sesuatu disini..." required></textarea>
                     
@@ -229,7 +251,7 @@ $query_rating = mysqli_query($conn, "SELECT rating.*, users.foto_profil FROM rat
                         
                         <input type="hidden" name="id_edit" id="id_edit" value="0">
                         <input type="hidden" name="rating_value" id="rating_value" value="0">
-                        <button type="submit" name="kirim_rating" id="btn_submit" class="btn-kirim">Kirim</button>
+                        <button type="submit" id="btn_submit" class="btn-kirim">Kirim</button>
                     </div>
                 </form>
             </div>
@@ -320,6 +342,125 @@ $query_rating = mysqli_query($conn, "SELECT rating.*, users.foto_profil FROM rat
             document.querySelector('.input-section').scrollIntoView({ behavior: 'smooth' });
             document.getElementById('input_komentar').focus();
         }
+
+        // --- LOGIKA AJAX HAPUS REVIEW ---
+        function hapusReview(id) {
+            Swal.fire({
+                title: 'Yakin mau hapus?',
+                text: "Review lu bakal hilang permanen nih!",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#ff4d4d',
+                cancelButtonColor: '#888',
+                confirmButtonText: 'Ya, Hapus!',
+                cancelButtonText: 'Batal',
+                heightAuto: false
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    const formData = new FormData();
+                    formData.append('ajax_action', 'hapus');
+                    formData.append('id_rating', id);
+
+                    fetch('rating.php', {
+                        method: 'POST',
+                        body: formData
+                    })
+                    .then(res => res.json())
+                    .then(data => {
+                        if(data.status === 'success') {
+                            Swal.fire({
+                                title: 'Mantap!',
+                                text: data.pesan,
+                                icon: 'success',
+                                heightAuto: false
+                            }).then(() => location.reload());
+                        } else {
+                            Swal.fire({
+                                title: 'Gagal!',
+                                text: data.pesan,
+                                icon: 'error',
+                                heightAuto: false
+                            });
+                        }
+                    });
+                }
+            });
+        }
+
+        // --- LOGIKA AJAX SUBMIT (TAMBAH/UPDATE) REVIEW ---
+        const formRating = document.getElementById('formRating');
+        formRating.addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            const ratingVal = document.getElementById('rating_value').value;
+            if (ratingVal == 0) {
+                Swal.fire({
+                    title: 'Oops!',
+                    text: 'Pilih bintangnya dulu dong bos!',
+                    icon: 'warning',
+                    confirmButtonColor: '#ffb800',
+                    heightAuto: false
+                });
+                return;
+            }
+
+            const formData = new FormData(this);
+            formData.append('ajax_action', 'simpan');
+
+            const btnSubmit = document.getElementById('btn_submit');
+            const originalText = btnSubmit.innerHTML;
+            btnSubmit.innerHTML = "Loading...";
+            btnSubmit.disabled = true;
+
+            fetch('rating.php', {
+                method: 'POST',
+                body: formData
+            })
+            .then(res => res.json())
+            .then(data => {
+                btnSubmit.innerHTML = originalText;
+                btnSubmit.disabled = false;
+
+                if (data.status === 'success') {
+                    Swal.fire({
+                        title: 'Mantap!',
+                        text: data.pesan,
+                        icon: 'success',
+                        confirmButtonColor: '#4a6fdc',
+                        heightAuto: false
+                    }).then(() => {
+                        location.reload(); 
+                    });
+                } else if (data.status === 'warning') {
+                    Swal.fire({
+                        title: 'Perhatian!',
+                        text: data.pesan,
+                        icon: 'warning',
+                        confirmButtonColor: '#ffb800',
+                        heightAuto: false
+                    });
+                } else {
+                    Swal.fire({
+                        title: 'Gagal!',
+                        text: data.pesan,
+                        icon: 'error',
+                        confirmButtonColor: '#ff1a73',
+                        heightAuto: false
+                    });
+                }
+            })
+            .catch(error => {
+                btnSubmit.innerHTML = originalText;
+                btnSubmit.disabled = false;
+                Swal.fire({
+                    title: 'Error!',
+                    text: 'Jaringan lu lagi bapuk kayaknya bos, coba lagi!',
+                    icon: 'error',
+                    confirmButtonColor: '#ff1a73',
+                    heightAuto: false
+                });
+            });
+        });
     </script>
 </body>
 </html>

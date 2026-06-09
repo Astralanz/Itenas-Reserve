@@ -7,12 +7,18 @@ if (!isset($_SESSION['user_id'])) {
 include 'koneksi.php';
 
 // Menyesuaikan dengan parameter kiriman dari halaman utama (?id_aset=)
-if (!isset($_GET['id_aset'])) {
+if (!isset($_GET['id_aset']) || empty($_GET['id_aset'])) {
     die("<script>alert('Error: Pilih aset dulu dari halaman utama!'); window.location.href='index.php';</script>");
 }
 
-$id_aset = $_GET['id_aset'];
+$id_aset = mysqli_real_escape_string($conn, $_GET['id_aset']);
 $query_aset = mysqli_query($conn, "SELECT nama_aset FROM aset WHERE id = '$id_aset'");
+
+// Pengaman tambahan kalau id aset nggak ada di database
+if (mysqli_num_rows($query_aset) == 0) {
+    die("<script>alert('Error: Aset tidak ditemukan atau sudah dihapus!'); window.location.href='index.php';</script>");
+}
+
 $data_aset = mysqli_fetch_array($query_aset);
 
 // --- LOGIKA TARIK NAMA, NIM, PRODI OTOMATIS ---
@@ -40,10 +46,17 @@ $list_prodi = [
 if(isset($list_prodi[$kode_prodi])) $prodi_user = $list_prodi[$kode_prodi];
 
 // --- LOGIKA UNTUK PEMBATASAN TANGGAL (MAKSIMAL 3 HARI) ---
+date_default_timezone_set('Asia/Jakarta');
 $hari_ini = date('Y-m-d');
 $batas_tanggal = date('Y-m-d', strtotime('+2 days')); // Hari ini, Besok, Lusa
+$jam_sekarang_server = date('H:i'); // Ambil jam server saat ini
 
-if (isset($_POST['submit'])) {
+// =========================================================================
+// --- LOGIKA AJAX SUBMIT BOOKING (BEKERJA DI BELAKANG LAYAR) ---
+// =========================================================================
+if (isset($_POST['ajax_submit'])) {
+    header('Content-Type: application/json');
+    
     $nama     = mysqli_real_escape_string($conn, $nama_asli);
     $nim      = mysqli_real_escape_string($conn, $nim_user);
     $prodi    = mysqli_real_escape_string($conn, $prodi_user);
@@ -53,21 +66,27 @@ if (isset($_POST['submit'])) {
     $selesai  = mysqli_real_escape_string($conn, $_POST['jam_selesai']);
     $user_id  = $_SESSION['user_id']; 
 
-    // 1. Validasi Tanggal Server
+    // 1. Validasi Tanggal
     if ($tanggal < $hari_ini || $tanggal > $batas_tanggal) {
-        echo "<script>alert('❌ Maaf, booking hanya bisa untuk hari ini sampai 2 hari ke depan!'); window.history.back();</script>";
+        echo json_encode(['status' => 'error', 'pesan' => 'Maaf, booking hanya bisa untuk hari ini sampai 2 hari ke depan!']);
         exit();
     }
 
-    // 2. Validasi Jam Server (06:00 - 18:00)
+    // 2. Validasi Jam Operasional (06:00 - 18:00)
     if ($mulai < '06:00' || $selesai > '18:00') {
-        echo "<script>alert('❌ Maaf bos, jam operasional cuma dari jam 06:00 sampai 18:00!'); window.history.back();</script>";
+        echo json_encode(['status' => 'error', 'pesan' => 'Maaf bos, jam operasional cuma dari jam 06:00 sampai 18:00!']);
         exit();
     }
     
-    // 3. Validasi Logika Jam
+    // 3. Validasi Logika Jam Terbalik
     if ($mulai >= $selesai) {
-        echo "<script>alert('❌ Jam mulai gak boleh melebihi atau sama dengan jam selesai!'); window.history.back();</script>";
+        echo json_encode(['status' => 'error', 'pesan' => 'Jam mulai gak boleh melebihi atau sama dengan jam selesai!']);
+        exit();
+    }
+
+    // 4. Validasi Jam Udah Lewat (PERTahanan Backend)
+    if ($tanggal == $hari_ini && $mulai <= $jam_sekarang_server) {
+        echo json_encode(['status' => 'error', 'pesan' => 'Waktu booking invalid! Jam yang lu pilih udah lewat bos.']);
         exit();
     }
 
@@ -75,14 +94,13 @@ if (isset($_POST['submit'])) {
                      VALUES ('$user_id', '$id_aset', '$nama', '$nim', '$prodi', '$tanggal', '$mulai', '$selesai', 'pending')";
     
     if (mysqli_query($conn, $query_insert)) {
-        echo "<script>
-                alert('🎉 Pengajuan berhasil! Status: Menunggu persetujuan Admin.');
-                window.location.href='index.php';
-              </script>";
+        echo json_encode(['status' => 'success', 'pesan' => '🎉 Pengajuan berhasil! Menunggu persetujuan Admin.']);
     } else {
-        echo "Wah gagal nyimpen data: " . mysqli_error($conn);
+        echo json_encode(['status' => 'error', 'pesan' => 'Wah gagal nyimpen data: ' . mysqli_error($conn)]);
     }
+    exit();
 }
+// =========================================================================
 ?>
 
 <!DOCTYPE html>
@@ -92,6 +110,7 @@ if (isset($_POST['submit'])) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Booking - Itenas Reserve</title>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
         * { box-sizing: border-box; font-family: 'Poppins', sans-serif; margin: 0; padding: 0; }
         body { background-color: #4a6fdc; height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
@@ -103,12 +122,17 @@ if (isset($_POST['submit'])) {
         .input-control { width: 100%; padding: 12px 20px; border-radius: 35px; border: 1px solid #ccc; outline: none; font-size: 14px; transition: 0.3s; background-color: white; }
         .input-control:focus { border-color: #4a6fdc; box-shadow: 0 0 10px rgba(74, 111, 220, 0.1); }
         .input-readonly { background-color: #e9ecef; color: #666; cursor: not-allowed; border-color: #ddd; }
+        
+        /* Dropdown options styling for disabled */
+        select option:disabled { color: #aaa; font-style: italic; }
+
         .row-inputs { display: flex; gap: 15px; }
         .row-inputs .input-group { flex: 1; }
         .action-buttons { display: flex; align-items: center; justify-content: space-between; margin-top: 30px; gap: 15px; }
         .btn-submit-wrapper { flex: 1.5; padding: 2px; background: linear-gradient(to right, #4169e1, #ffa3ff); border-radius: 35px; }
         .btn-submit { width: 100%; background-color: white; border: none; border-radius: 33px; padding: 12px 0; font-size: 14px; font-weight: 600; color: #4a6fdc; cursor: pointer; transition: 0.2s; }
         .btn-submit:hover { background-color: #4a6fdc; color: white; }
+        .btn-submit:disabled { background-color: #e9ecef; color: #888; cursor: not-allowed; } 
         .btn-cancel { flex: 1; text-align: center; padding: 12px 0; border-radius: 35px; border: 1px solid #dc2626; color: #dc2626; text-decoration: none; font-size: 14px; font-weight: 600; transition: 0.3s; }
         .btn-cancel:hover { background-color: #dc2626; color: white; }
         .note-text { font-size: 11px; color: #e50000; font-style: italic; margin-top: 5px; padding-left: 5px; display: block; }
@@ -120,7 +144,7 @@ if (isset($_POST['submit'])) {
         <h2>Pinjam: <?php echo htmlspecialchars($data_aset['nama_aset']); ?></h2>
         <p class="subtitle">Isi dulu ya</p>
 
-        <form action="" method="POST">
+        <form id="formBooking" action="" method="POST">
             
             <div class="input-group">
                 <label>Nama Lengkap</label>
@@ -141,7 +165,7 @@ if (isset($_POST['submit'])) {
 
             <div class="input-group">
                 <label>Tanggal Pinjam</label>
-                <input type="date" name="tanggal" class="input-control"
+                <input type="date" name="tanggal" class="input-control" id="inputTanggal"
                        min="<?php echo $hari_ini; ?>" 
                        max="<?php echo $batas_tanggal; ?>" 
                        value="<?php echo $hari_ini; ?>" required>
@@ -151,11 +175,11 @@ if (isset($_POST['submit'])) {
             <div class="row-inputs">
                 <div class="input-group">
                     <label>Jam Mulai</label>
-                    <select name="jam_mulai" class="input-control" required>
+                    <select name="jam_mulai" class="input-control" id="selectJamMulai" required>
                         <option value="" disabled selected>--:--</option>
                         <?php
                         for ($h = 6; $h <= 18; $h++) {
-                            for ($m = 0; $m < 60; $m += 30) { // Interval 30 menit, ganti ke += 15 kalau mau per 15 menit
+                            for ($m = 0; $m < 60; $m += 30) { 
                                 if ($h == 18 && $m > 0) break;
                                 $time = sprintf('%02d:%02d', $h, $m);
                                 echo "<option value='$time'>$time</option>";
@@ -167,7 +191,7 @@ if (isset($_POST['submit'])) {
 
                 <div class="input-group">
                     <label>Jam Selesai</label>
-                    <select name="jam_selesai" class="input-control" required>
+                    <select name="jam_selesai" class="input-control" id="selectJamSelesai" required>
                         <option value="" disabled selected>--:--</option>
                         <?php
                         for ($h = 6; $h <= 18; $h++) {
@@ -186,27 +210,121 @@ if (isset($_POST['submit'])) {
             <div class="action-buttons">
                 <a href="index.php" class="btn-cancel">Batal</a>
                 <div class="btn-submit-wrapper">
-                    <button type="submit" name="submit" class="btn-submit">Ajukan Pinjaman</button>
+                    <button type="submit" class="btn-submit" id="btnSubmitAJAX">Ajukan Pinjaman</button>
                 </div>
             </div>
         </form>
     </div>
 
     <script>
-        const jamMulai = document.querySelector('select[name="jam_mulai"]');
-        const jamSelesai = document.querySelector('select[name="jam_selesai"]');
+        const tanggalInput = document.getElementById('inputTanggal');
+        const jamMulai = document.getElementById('selectJamMulai');
+        const jamSelesai = document.getElementById('selectJamSelesai');
+        const formBooking = document.getElementById('formBooking');
+        const btnSubmit = document.getElementById('btnSubmitAJAX');
+        
+        // Patokan tanggal hari ini dari server PHP biar gak ngaco
+        const hariIniServer = "<?php echo $hari_ini; ?>";
 
+        // --- FUNGSI MENGUNCI JAM YANG SUDAH LEWAT ---
+        function updateJamKadaluarsa() {
+            const selectedDate = tanggalInput.value;
+            const isToday = (selectedDate === hariIniServer);
+
+            // Bikin objek waktu dari laptop user untuk kelancaran UI secara Real-Time
+            const now = new Date();
+            const jam = String(now.getHours()).padStart(2, '0');
+            const menit = String(now.getMinutes()).padStart(2, '0');
+            const waktuSekarang = `${jam}:${menit}`;
+
+            [jamMulai, jamSelesai].forEach(selectBox => {
+                Array.from(selectBox.options).forEach(option => {
+                    if (option.value === "") return; // Skip opsi default (--:--)
+
+                    // Kalau milih tanggal HARI INI dan jamnya lebih kecil dari jam sekarang = DISABLE
+                    if (isToday && option.value <= waktuSekarang) {
+                        option.disabled = true;
+                        option.style.backgroundColor = "#e9ecef"; // warna abu-abu
+                    } else {
+                        // Kalau besok/lusa, bebasin semua jamnya
+                        option.disabled = false;
+                        option.style.backgroundColor = "white";
+                    }
+                });
+
+                // Kalau tiba-tiba opsi yang udah terlanjur diklik jadi 'disabled' (misal nunggu kelamaan), reset isinya
+                if (selectBox.options[selectBox.selectedIndex] && selectBox.options[selectBox.selectedIndex].disabled) {
+                    selectBox.value = "";
+                }
+            });
+        }
+
+        // Panggil saat tanggal diubah dan saat pertama kali halaman diload
+        tanggalInput.addEventListener('change', updateJamKadaluarsa);
+        updateJamKadaluarsa();
+
+        // --- LOGIKA Pengecekan Jam Mulai vs Jam Selesai ---
         function cekLogikaJam() {
             if (jamMulai.value && jamSelesai.value) {
                 if (jamMulai.value >= jamSelesai.value) {
-                    alert("❌ Jam mulai gak boleh lebih besar atau sama dengan jam selesai, bosku!");
-                    jamSelesai.value = ""; // Reset paksa isi pilihan jam selesai
+                    Swal.fire({
+                        title: 'Oops!',
+                        text: 'Jam mulai gak boleh lebih besar atau sama dengan jam selesai, bosku!',
+                        icon: 'warning',
+                        confirmButtonColor: '#ff1a73'
+                    });
+                    jamSelesai.value = ""; 
                 }
             }
         }
 
         jamMulai.addEventListener('change', cekLogikaJam);
         jamSelesai.addEventListener('change', cekLogikaJam);
+
+        // --- EKSEKUSI AJAX PAS FORM DIKIRIM ---
+        formBooking.addEventListener('submit', function(e) {
+            e.preventDefault(); 
+
+            const formData = new FormData(this);
+            formData.append('ajax_submit', '1'); 
+
+            const originalText = btnSubmit.innerHTML;
+            btnSubmit.innerHTML = 'Mengirim Data...';
+            btnSubmit.disabled = true;
+
+            fetch(`form_pinjam.php?id_aset=<?php echo $id_aset; ?>`, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                btnSubmit.innerHTML = originalText;
+                btnSubmit.disabled = false;
+
+                if(data.status === 'success') {
+                    Swal.fire({
+                        title: 'Mantap!',
+                        text: data.pesan,
+                        icon: 'success',
+                        confirmButtonColor: '#4a6fdc'
+                    }).then(() => {
+                        window.location.href = 'index.php';
+                    });
+                } else {
+                    Swal.fire({
+                        title: 'Gagal!',
+                        text: data.pesan,
+                        icon: 'error',
+                        confirmButtonColor: '#ff1a73'
+                    });
+                }
+            })
+            .catch(error => {
+                btnSubmit.innerHTML = originalText;
+                btnSubmit.disabled = false;
+                Swal.fire('Error!', 'Jaringan lu lagi bapuk kayaknya bos, coba lagi!', 'error');
+            });
+        });
     </script>
 
 </body>

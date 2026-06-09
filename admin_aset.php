@@ -5,50 +5,64 @@ include 'koneksi.php';
 // Atur timezone
 date_default_timezone_set('Asia/Jakarta');
 
-// Proteksi halaman admin + Cek Role (Biar mhs ga bisa tembus lewat URL)
+// Proteksi halaman admin + Cek Role
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
     header("Location: login.php");
     exit();
 }
 
-// --- LOGIKA 1: TAMBAH ASET BARU ---
-if (isset($_POST['tambah_aset'])) {
-    $nama_aset = mysqli_real_escape_string($conn, $_POST['nama_aset']);
-    $deskripsi = mysqli_real_escape_string($conn, $_POST['deskripsi']); 
-    
-    $insert = mysqli_query($conn, "INSERT INTO aset (nama_aset, deskripsi) VALUES ('$nama_aset', '$deskripsi')");
-    if ($insert) {
-        echo "<script>alert('Fasilitas baru berhasil ditambahkan!'); window.location.href='admin_aset.php';</script>";
+// =========================================================================
+// --- LOGIKA AJAX UNTUK ASET (BEKERJA DI BELAKANG LAYAR) ---
+// =========================================================================
+if (isset($_POST['ajax_action'])) {
+    header('Content-Type: application/json');
+    $action = $_POST['ajax_action'];
+
+    // 1. AJAX TAMBAH ASET
+    if ($action == 'tambah_aset') {
+        $nama_aset = mysqli_real_escape_string($conn, $_POST['nama_aset']);
+        $deskripsi = mysqli_real_escape_string($conn, $_POST['deskripsi']); 
+        
+        $insert = mysqli_query($conn, "INSERT INTO aset (nama_aset, deskripsi) VALUES ('$nama_aset', '$deskripsi')");
+        if ($insert) {
+            echo json_encode(['status' => 'success', 'pesan' => 'Fasilitas baru berhasil ditambahkan!']);
+        } else {
+            echo json_encode(['status' => 'error', 'pesan' => 'Gagal menambah fasilitas bos!']);
+        }
+        exit();
+    }
+
+    // 2. AJAX UPDATE ASET
+    if ($action == 'edit_aset') {
+        $id_aset = mysqli_real_escape_string($conn, $_POST['id_aset']);
+        $nama_aset = mysqli_real_escape_string($conn, $_POST['nama_aset']);
+        $deskripsi = mysqli_real_escape_string($conn, $_POST['deskripsi']); 
+        
+        $update = mysqli_query($conn, "UPDATE aset SET nama_aset = '$nama_aset', deskripsi = '$deskripsi' WHERE id = '$id_aset'");
+        if ($update) {
+            echo json_encode(['status' => 'success', 'pesan' => 'Fasilitas berhasil diupdate!']);
+        } else {
+            echo json_encode(['status' => 'error', 'pesan' => 'Gagal mengupdate fasilitas!']);
+        }
+        exit();
+    }
+
+    // 3. AJAX HAPUS ASET
+    if ($action == 'hapus_aset') {
+        $id_aset = mysqli_real_escape_string($conn, $_POST['id_aset']);
+        
+        $hapus = mysqli_query($conn, "DELETE FROM aset WHERE id = '$id_aset'");
+        if ($hapus) {
+            echo json_encode(['status' => 'success', 'pesan' => 'Fasilitas berhasil dihapus!']);
+        } else {
+            echo json_encode(['status' => 'error', 'pesan' => 'Gagal hapus! Mungkin aset ini lagi dipake antrian peminjaman.']);
+        }
+        exit();
     }
 }
+// =========================================================================
 
-// --- LOGIKA 2: UPDATE/EDIT ASET ---
-if (isset($_POST['edit_aset'])) {
-    $id_aset = mysqli_real_escape_string($conn, $_POST['id_aset']);
-    $nama_aset = mysqli_real_escape_string($conn, $_POST['nama_aset']);
-    $deskripsi = mysqli_real_escape_string($conn, $_POST['deskripsi']); 
-    
-    $update = mysqli_query($conn, "UPDATE aset SET nama_aset = '$nama_aset', deskripsi = '$deskripsi' WHERE id = '$id_aset'");
-    if ($update) {
-        echo "<script>alert('Fasilitas berhasil diupdate!'); window.location.href='admin_aset.php';</script>";
-    } else {
-        echo "<script>alert('Gagal mengupdate fasilitas!'); window.location.href='admin_aset.php';</script>";
-    }
-}
-
-// --- LOGIKA 3: HAPUS ASET ---
-if (isset($_GET['hapus_aset'])) {
-    $id_aset = mysqli_real_escape_string($conn, $_GET['hapus_aset']);
-    
-    $hapus = mysqli_query($conn, "DELETE FROM aset WHERE id = '$id_aset'");
-    if ($hapus) {
-        echo "<script>alert('Fasilitas berhasil dihapus!'); window.location.href='admin_aset.php';</script>";
-    } else {
-        echo "<script>alert('Gagal hapus! Mungkin aset ini sedang ada di daftar peminjaman.'); window.location.href='admin_aset.php';</script>";
-    }
-}
-
-// --- LOGIKA 4: PENCARIAN (SEARCH) ---
+// --- LOGIKA 4: PENCARIAN (SEARCH) - Tetap pakai reload karena ngubah URL ---
 $search = "";
 if (isset($_GET['search'])) {
     $search = mysqli_real_escape_string($conn, $_GET['search']);
@@ -65,6 +79,7 @@ if (isset($_GET['search'])) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin - Aset Kampus</title>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
         * { box-sizing: border-box; font-family: 'Poppins', sans-serif; margin: 0; padding: 0; }
         body { 
@@ -84,7 +99,7 @@ if (isset($_GET['search'])) {
         .sidebar-menu { 
             background-color: #ff1a73; border-radius: 20px; padding: 30px 15px; 
             flex: 1; color: white; box-shadow: 0 10px 20px rgba(255, 26, 115, 0.2);
-            display: flex; flex-direction: column; justify-content: space-between; /* Menjaga posisi logout tetap di bawah */
+            display: flex; flex-direction: column; justify-content: space-between;
             overflow-y: auto;
         }
         .menu-list { list-style: none; display: flex; flex-direction: column; gap: 10px; }
@@ -96,10 +111,6 @@ if (isset($_GET['search'])) {
         .menu-item.active a { background-color: white; color: black; }
         .menu-item:not(.active) a:hover { background-color: rgba(255, 255, 255, 0.1); }
         
-        .sub-menu { margin-left: 45px; margin-top: 5px; display: flex; flex-direction: column; gap: 8px; }
-        .sub-menu a { color: white; text-decoration: none; font-size: 13px; font-style: italic; opacity: 0.9; }
-        .sub-menu a:hover { opacity: 1; text-decoration: underline; }
-
         /* --- MAIN CONTENT --- */
         .main-content { flex: 1; display: flex; flex-direction: column; padding: 10px 20px; overflow: hidden; }
         
@@ -117,7 +128,7 @@ if (isset($_GET['search'])) {
         .btn-tambah { 
             background-color: #ff1a73; color: white; border: none; border-radius: 15px; 
             padding: 0 30px; font-size: 15px; font-weight: 600; cursor: pointer; 
-            transition: 0.2s; box-shadow: 0 5px 15px rgba(255, 26, 115, 0.3); display: flex; align-items: center; gap: 8px;
+            transition: 0.2s; box-shadow: 0 5px 15px rgba(255, 26, 115, 0.3); display: flex; align-items: center; gap: 8px; font-family: 'Poppins', sans-serif;
         }
         .btn-tambah:hover { background-color: #e6005c; transform: translateY(-2px); }
 
@@ -138,7 +149,7 @@ if (isset($_GET['search'])) {
         .btn-action { 
             border: none; padding: 8px 25px; border-radius: 20px; 
             font-size: 12px; font-weight: 700; color: white; cursor: pointer; 
-            text-transform: uppercase; text-decoration: none; transition: 0.2s;
+            text-transform: uppercase; text-decoration: none; transition: 0.2s; font-family: 'Poppins', sans-serif;
         }
         .btn-edit { background-color: #ffb800; }
         .btn-edit:hover { background-color: #e6a600; }
@@ -164,13 +175,13 @@ if (isset($_GET['search'])) {
         .form-group { margin-bottom: 15px; }
         .form-group label { display: block; font-size: 13px; color: #555; margin-bottom: 5px; font-weight: 500; }
         .form-group input, .form-group textarea {
-            width: 100%; border: 1.5px solid #ddd; border-radius: 10px; padding: 10px 15px; font-size: 14px; outline: none;
+            width: 100%; border: 1.5px solid #ddd; border-radius: 10px; padding: 10px 15px; font-size: 14px; outline: none; font-family: 'Poppins', sans-serif;
         }
         .form-group input:focus, .form-group textarea:focus { border-color: #ff1a73; }
         
         .btn-submit-modal {
             width: 100%; color: white; border: none; padding: 12px;
-            border-radius: 10px; font-weight: 600; font-size: 15px; cursor: pointer; margin-top: 10px; transition: 0.2s;
+            border-radius: 10px; font-weight: 600; font-size: 15px; cursor: pointer; margin-top: 10px; transition: 0.2s; font-family: 'Poppins', sans-serif;
         }
         .btn-tambah-submit { background: #ff1a73; }
         .btn-tambah-submit:hover { background: #e6005c; }
@@ -237,7 +248,7 @@ if (isset($_GET['search'])) {
                     </div>
                     <div class="aset-actions">
                         <button class="btn-action btn-edit" onclick="bukaModalEdit('<?php echo $data['id']; ?>', '<?php echo addslashes(htmlspecialchars($data['nama_aset'])); ?>', '<?php echo addslashes(htmlspecialchars($data['deskripsi'])); ?>')">EDIT</button>
-                        <a href="admin_aset.php?hapus_aset=<?php echo $data['id']; ?>" class="btn-action btn-hapus" onclick="return confirm('Yakin mau hapus fasilitas ini?');">HAPUS</a>
+                        <button class="btn-action btn-hapus" onclick="hapusAset(<?php echo $data['id']; ?>)">HAPUS</button>
                     </div>
                 </div>
             <?php 
@@ -253,7 +264,7 @@ if (isset($_GET['search'])) {
         <div class="modal-box">
             <span class="close-modal" onclick="tutupModalTambah()">&times;</span>
             <h3 class="modal-title title-tambah">Tambah Aset Baru</h3>
-            <form method="POST" action="">
+            <form id="formTambah">
                 <div class="form-group">
                     <label>Nama Aset / Fasilitas</label>
                     <input type="text" name="nama_aset" placeholder="Contoh: Lapangan Basket" required>
@@ -262,7 +273,7 @@ if (isset($_GET['search'])) {
                     <label>Deskripsi Detail</label>
                     <textarea name="deskripsi" rows="3" placeholder="Contoh: Lapangan basket outdoor dekat GSG..." required></textarea>
                 </div>
-                <button type="submit" name="tambah_aset" class="btn-submit-modal btn-tambah-submit">Simpan Aset</button>
+                <button type="submit" class="btn-submit-modal btn-tambah-submit">Simpan Aset</button>
             </form>
         </div>
     </div>
@@ -271,7 +282,7 @@ if (isset($_GET['search'])) {
         <div class="modal-box">
             <span class="close-modal" onclick="tutupModalEdit()">&times;</span>
             <h3 class="modal-title title-edit">Edit Aset Kampus</h3>
-            <form method="POST" action="">
+            <form id="formEdit">
                 <input type="hidden" name="id_aset" id="edit_id_aset">
                 
                 <div class="form-group">
@@ -282,7 +293,7 @@ if (isset($_GET['search'])) {
                     <label>Deskripsi Detail</label>
                     <textarea name="deskripsi" id="edit_deskripsi" rows="3" required></textarea>
                 </div>
-                <button type="submit" name="edit_aset" class="btn-submit-modal btn-edit-submit">Update Aset</button>
+                <button type="submit" class="btn-submit-modal btn-edit-submit">Update Aset</button>
             </form>
         </div>
     </div>
@@ -291,11 +302,10 @@ if (isset($_GET['search'])) {
         const modalTambah = document.getElementById('modalTambah');
         const modalEdit = document.getElementById('modalEdit');
 
-        // Fungsi Buka Tutup Modal Tambah
+        // --- Fungsi Buka Tutup Modal ---
         function bukaModalTambah() { modalTambah.style.display = 'flex'; }
         function tutupModalTambah() { modalTambah.style.display = 'none'; }
 
-        // Fungsi Buka Tutup Modal Edit (Plus masukin data yg mau diedit ke form)
         function bukaModalEdit(id, nama, deskripsi) {
             document.getElementById('edit_id_aset').value = id;
             document.getElementById('edit_nama_aset').value = nama;
@@ -304,10 +314,125 @@ if (isset($_GET['search'])) {
         }
         function tutupModalEdit() { modalEdit.style.display = 'none'; }
 
-        // Tutup modal kalau klik area gelap di luarnya
         window.onclick = function(event) {
             if (event.target == modalTambah) { modalTambah.style.display = 'none'; }
             if (event.target == modalEdit) { modalEdit.style.display = 'none'; }
+        }
+
+        // --- LOGIKA AJAX SUBMIT FORM TAMBAH ---
+        document.getElementById('formTambah').addEventListener('submit', function(e) {
+            e.preventDefault();
+            kirimData(this, 'tambah_aset', tutupModalTambah);
+        });
+
+        // --- LOGIKA AJAX SUBMIT FORM EDIT ---
+        document.getElementById('formEdit').addEventListener('submit', function(e) {
+            e.preventDefault();
+            kirimData(this, 'edit_aset', tutupModalEdit);
+        });
+
+        // --- FUNGSI PUSAT PENGIRIMAN DATA FORM ---
+        function kirimData(formElement, actionName, closeFunction) {
+            const formData = new FormData(formElement);
+            formData.append('ajax_action', actionName);
+
+            const btnSubmit = formElement.querySelector('button[type="submit"]');
+            const originalText = btnSubmit.innerHTML;
+            btnSubmit.innerHTML = 'Loading...';
+            btnSubmit.disabled = true;
+
+            fetch('admin_aset.php', {
+                method: 'POST',
+                body: formData
+            })
+            .then(res => res.json())
+            .then(data => {
+                btnSubmit.innerHTML = originalText;
+                btnSubmit.disabled = false;
+                closeFunction(); // Tutup modal
+
+                if(data.status === 'success') {
+                    Swal.fire({
+                        title: 'Mantap!',
+                        text: data.pesan,
+                        icon: 'success',
+                        confirmButtonColor: '#ff1a73',
+                        heightAuto: false
+                    }).then(() => location.reload());
+                } else {
+                    Swal.fire({
+                        title: 'Gagal!',
+                        text: data.pesan,
+                        icon: 'error',
+                        confirmButtonColor: '#888',
+                        heightAuto: false
+                    });
+                }
+            })
+            .catch(error => {
+                btnSubmit.innerHTML = originalText;
+                btnSubmit.disabled = false;
+                Swal.fire({
+                    title: 'Error!',
+                    text: 'Jaringan lu lagi bapuk kayaknya bos, coba lagi!',
+                    icon: 'error',
+                    heightAuto: false
+                });
+            });
+        }
+
+        // --- LOGIKA AJAX HAPUS ASET ---
+        function hapusAset(id) {
+            Swal.fire({
+                title: 'Yakin mau hapus?',
+                text: "Fasilitas bakal dihilangkan dari sistem!",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#ff1a73',
+                cancelButtonColor: '#888',
+                confirmButtonText: 'Ya, Hapus!',
+                cancelButtonText: 'Batal',
+                heightAuto: false
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    const formData = new FormData();
+                    formData.append('ajax_action', 'hapus_aset');
+                    formData.append('id_aset', id);
+
+                    fetch('admin_aset.php', {
+                        method: 'POST',
+                        body: formData
+                    })
+                    .then(res => res.json())
+                    .then(data => {
+                        if(data.status === 'success') {
+                            Swal.fire({
+                                title: 'Mantap!',
+                                text: data.pesan,
+                                icon: 'success',
+                                confirmButtonColor: '#ff1a73',
+                                heightAuto: false
+                            }).then(() => location.reload());
+                        } else {
+                            Swal.fire({
+                                title: 'Gagal!',
+                                text: data.pesan,
+                                icon: 'error',
+                                confirmButtonColor: '#888',
+                                heightAuto: false
+                            });
+                        }
+                    })
+                    .catch(error => {
+                        Swal.fire({
+                            title: 'Error!',
+                            text: 'Jaringan lu lagi bapuk kayaknya bos, coba lagi!',
+                            icon: 'error',
+                            heightAuto: false
+                        });
+                    });
+                }
+            });
         }
     </script>
 </body>

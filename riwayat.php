@@ -14,19 +14,35 @@ if (!isset($_SESSION['user_id'])) {
 // Variabel ini disiapin di sini biar sidebar.php bisa langsung pake
 $email_user = $_SESSION['email'];
 
-// --- LOGIKA TOMBOL BATALKAN ---
-if (isset($_POST['batalkan_peminjaman'])) {
+// =========================================================================
+// --- LOGIKA AJAX BATALKAN & SELESAIKAN (BEKERJA DI BELAKANG LAYAR) ---
+// =========================================================================
+if (isset($_POST['ajax_action'])) {
+    header('Content-Type: application/json');
+    $action = $_POST['ajax_action'];
     $id_peminjaman = mysqli_real_escape_string($conn, $_POST['id_peminjaman']);
-    mysqli_query($conn, "DELETE FROM peminjaman WHERE id = '$id_peminjaman'");
-    echo "<script>alert('Peminjaman berhasil dibatalkan!'); window.location.href='riwayat.php';</script>";
-}
 
-// --- LOGIKA TOMBOL SELESAIKAN ---
-if (isset($_POST['selesaikan_peminjaman'])) {
-    $id_peminjaman = mysqli_real_escape_string($conn, $_POST['id_peminjaman']);
-    mysqli_query($conn, "UPDATE peminjaman SET status = 'SELESAI' WHERE id = '$id_peminjaman'");
-    echo "<script>alert('Fasilitas telah selesai digunakan lebih awal!'); window.location.href='riwayat.php';</script>";
+    if ($action == 'batalkan') {
+        $hapus = mysqli_query($conn, "DELETE FROM peminjaman WHERE id = '$id_peminjaman'");
+        if ($hapus) {
+            echo json_encode(['status' => 'success', 'pesan' => 'Peminjaman berhasil dibatalkan!']);
+        } else {
+            echo json_encode(['status' => 'error', 'pesan' => 'Gagal membatalkan peminjaman.']);
+        }
+        exit();
+    }
+
+    if ($action == 'selesaikan') {
+        $update = mysqli_query($conn, "UPDATE peminjaman SET status = 'SELESAI' WHERE id = '$id_peminjaman'");
+        if ($update) {
+            echo json_encode(['status' => 'success', 'pesan' => 'Fasilitas telah selesai digunakan lebih awal!']);
+        } else {
+            echo json_encode(['status' => 'error', 'pesan' => 'Gagal menyelesaikan peminjaman.']);
+        }
+        exit();
+    }
 }
+// =========================================================================
 
 // QUERY UTAMA
 $query_waiting = mysqli_query($conn, "SELECT peminjaman.*, aset.nama_aset 
@@ -49,6 +65,7 @@ if (file_exists($reasons_file)) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Waiting List - Itenas Reserve</title>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
         * { box-sizing: border-box; font-family: 'Poppins', sans-serif; margin: 0; padding: 0; }
         body { background-color: #eef2fc; height: 100vh; display: flex; overflow: hidden; padding: 20px; }
@@ -57,7 +74,6 @@ if (file_exists($reasons_file)) {
         .sidebar { width: 320px; background-color: #dce4f7; border-radius: 30px; padding: 30px 20px; display: flex; flex-direction: column; justify-content: space-between; }
         .profile-section { display: flex; align-items: center; gap: 15px; margin-bottom: 40px; padding-left: 10px; }
         
-        /* CLASS AVATAR SAMA KAYA INDEX (Aman dari error) */
         .avatar-box { 
             width: 60px; 
             height: 60px; 
@@ -92,7 +108,9 @@ if (file_exists($reasons_file)) {
         .status-pending { color: #555; }
         .status-approved { color: #16a34a; font-weight: 600; }
         .status-rejected { color: #dc2626; }
-        .btn-action { border: none; padding: 10px 0; border-radius: 15px; font-size: 13px; font-weight: 600; color: white; cursor: pointer; width: 120px; text-align: center; display: block; transition: 0.2s; }
+        
+        /* Tombol Aksi */
+        .btn-action { border: none; padding: 10px 0; border-radius: 15px; font-size: 13px; font-weight: 600; color: white; cursor: pointer; width: 120px; text-align: center; display: block; transition: 0.2s; font-family: 'Poppins', sans-serif;}
         .btn-red { background-color: #e50000; box-shadow: 0 4px 12px rgba(229, 0, 0, 0.2); }
         .btn-red:hover { background-color: #b80000; }
         .btn-orange { background-color: #ff9100; box-shadow: 0 4px 12px rgba(255, 145, 0, 0.2); }
@@ -190,15 +208,9 @@ if (file_exists($reasons_file)) {
                         </div>
                         <div>
                             <?php if ($status_db == 'PENDING') { ?>
-                                <form action="" method="POST">
-                                    <input type="hidden" name="id_peminjaman" value="<?php echo $row['id']; ?>">
-                                    <button type="submit" name="batalkan_peminjaman" class="btn-action btn-red">Batalkan</button>
-                                </form>
+                                <button onclick="batalkanPeminjaman(<?php echo $row['id']; ?>)" class="btn-action btn-red">Batalkan</button>
                             <?php } elseif (($status_db == 'APPROVED' || $status_db == 'ACC') && $is_billing_aktif) { ?>
-                                <form action="" method="POST">
-                                    <input type="hidden" name="id_peminjaman" value="<?php echo $row['id']; ?>">
-                                    <button type="submit" name="selesaikan_peminjaman" class="btn-action btn-orange">Selesaikan</button>
-                                </form>
+                                <button onclick="selesaikanPeminjaman(<?php echo $row['id']; ?>)" class="btn-action btn-orange">Selesaikan</button>
                             <?php } else { ?>
                                 -
                             <?php } ?>
@@ -213,5 +225,82 @@ if (file_exists($reasons_file)) {
         </div>
     </div>
 
+    <script>
+        function batalkanPeminjaman(id) {
+            Swal.fire({
+                title: 'Yakin mau batal?',
+                text: "Data pengajuan lu bakal dihapus nih!",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#e50000',
+                cancelButtonColor: '#888',
+                confirmButtonText: 'Ya, Batalkan!',
+                cancelButtonText: 'Gak jadi',
+                heightAuto: false
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    kirimAjax('batalkan', id);
+                }
+            });
+        }
+
+        function selesaikanPeminjaman(id) {
+            Swal.fire({
+                title: 'Udah selesai dipake?',
+                text: "Status bakal diubah jadi Selesai ya bos!",
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonColor: '#ff9100',
+                cancelButtonColor: '#888',
+                confirmButtonText: 'Ya, Selesai!',
+                cancelButtonText: 'Batal',
+                heightAuto: false
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    kirimAjax('selesaikan', id);
+                }
+            });
+        }
+
+        // Fungsi pusat buat nembak data ke backend
+        function kirimAjax(action, id) {
+            const formData = new FormData();
+            formData.append('ajax_action', action);
+            formData.append('id_peminjaman', id);
+
+            fetch('riwayat.php', {
+                method: 'POST',
+                body: formData
+            })
+            .then(res => res.json())
+            .then(data => {
+                if(data.status === 'success') {
+                    Swal.fire({
+                        title: 'Mantap!',
+                        text: data.pesan,
+                        icon: 'success',
+                        heightAuto: false
+                    }).then(() => {
+                        location.reload(); 
+                    });
+                } else {
+                    Swal.fire({
+                        title: 'Gagal!',
+                        text: data.pesan,
+                        icon: 'error',
+                        heightAuto: false
+                    });
+                }
+            })
+            .catch(error => {
+                Swal.fire({
+                    title: 'Error!',
+                    text: 'Jaringan lu lagi bapuk kayaknya bos, coba lagi!',
+                    icon: 'error',
+                    heightAuto: false
+                });
+            });
+        }
+    </script>
 </body>
 </html>

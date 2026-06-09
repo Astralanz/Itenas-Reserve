@@ -5,28 +5,12 @@ include 'koneksi.php';
 // Atur timezone
 date_default_timezone_set('Asia/Jakarta');
 
-// Proteksi halaman admin + Cek Role (Biar mhs ga bisa tembus)
+// Proteksi halaman admin
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
     header("Location: login.php");
     exit();
 }
 
-// --- LOGIKA HAPUS SEMUA RIWAYAT LAMA ---
-if (isset($_GET['aksi']) && $_GET['aksi'] == 'hapus_riwayat') {
-    $hapus = mysqli_query($conn, "DELETE FROM peminjaman WHERE status IN ('SELESAI', 'REJECTED', 'DITOLAK')");
-    
-    if ($hapus) {
-        echo "<script>alert('Mantap bos! Semua riwayat lama berhasil disapu bersih.'); window.location.href='admin_antrian.php';</script>";
-    } else {
-        echo "<script>alert('Gagal menghapus riwayat!'); window.location.href='admin_antrian.php';</script>";
-    }
-    exit();
-}
-
-$show_reject_form = false;
-$reject_data = null;
-
-// --- LOGIKA ACC & TOLAK PEMINJAMAN ---
 $reasons_file = __DIR__ . '/reject_reasons.json';
 $reject_reasons = [];
 if (file_exists($reasons_file)) {
@@ -34,28 +18,43 @@ if (file_exists($reasons_file)) {
     $reject_reasons = json_decode($contents, true) ?: [];
 }
 
-if (isset($_POST['tolak_submit'])) {
+// =========================================================================
+// --- LOGIKA AJAX (BEKERJA DI BELAKANG LAYAR TANPA LOADING) ---
+// =========================================================================
+
+// 1. AJAX Hapus Riwayat & ACC
+if (isset($_GET['ajax_action'])) {
+    header('Content-Type: application/json');
+    $action = $_GET['ajax_action'];
+
+    if ($action == 'hapus_riwayat') {
+        $hapus = mysqli_query($conn, "DELETE FROM peminjaman WHERE status IN ('SELESAI', 'REJECTED', 'DITOLAK')");
+        echo json_encode(['status' => $hapus ? 'success' : 'error', 'pesan' => $hapus ? 'Semua riwayat usang berhasil dibakar habis!' : 'Gagal menghapus riwayat!']);
+        exit();
+    }
+
+    if ($action == 'acc' && isset($_GET['id_pinjam'])) {
+        $id_pinjam = mysqli_real_escape_string($conn, $_GET['id_pinjam']);
+        mysqli_query($conn, "UPDATE peminjaman SET status = 'APPROVED' WHERE id = '$id_pinjam'");
+        echo json_encode(['status' => 'success', 'pesan' => 'Permohonan berhasil di-ACC!']);
+        exit();
+    }
+}
+
+// 2. AJAX Tolak Permohonan (Menerima input alasan dari SweetAlert)
+if (isset($_POST['ajax_action']) && $_POST['ajax_action'] == 'tolak') {
+    header('Content-Type: application/json');
     $id_pinjam = mysqli_real_escape_string($conn, $_POST['id_pinjam']);
     $alasan_tolak = trim($_POST['alasan_tolak']);
+    
     mysqli_query($conn, "UPDATE peminjaman SET status = 'REJECTED' WHERE id = '$id_pinjam'");
     $reject_reasons[$id_pinjam] = $alasan_tolak;
     file_put_contents($reasons_file, json_encode($reject_reasons, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
-    echo "<script>alert('Permohonan telah DITOLAK dengan alasan!'); window.location.href='admin_antrian.php';</script>";
+    
+    echo json_encode(['status' => 'success', 'pesan' => 'Permohonan telah DITOLAK beserta alasannya.']);
     exit();
-} elseif (isset($_GET['aksi']) && isset($_GET['id_pinjam'])) {
-    $id_pinjam = mysqli_real_escape_string($conn, $_GET['id_pinjam']);
-    $aksi = $_GET['aksi'];
-
-    if ($aksi == 'acc') {
-        mysqli_query($conn, "UPDATE peminjaman SET status = 'APPROVED' WHERE id = '$id_pinjam'");
-        echo "<script>alert('Permohonan berhasil di-ACC!'); window.location.href='admin_antrian.php';</script>";
-        exit();
-    } elseif ($aksi == 'tolak') {
-        $show_reject_form = true;
-        $result = mysqli_query($conn, "SELECT p.*, a.nama_aset FROM peminjaman p JOIN aset a ON p.aset_id = a.id WHERE p.id = '$id_pinjam' LIMIT 1");
-        $reject_data = mysqli_fetch_assoc($result);
-    }
 }
+// =========================================================================
 ?>
 
 <!DOCTYPE html>
@@ -65,6 +64,7 @@ if (isset($_POST['tolak_submit'])) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin - Antrian Permohonan</title>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
         * { box-sizing: border-box; font-family: 'Poppins', sans-serif; margin: 0; padding: 0; }
         body { 
@@ -94,14 +94,13 @@ if (isset($_POST['tolak_submit'])) {
             border-radius: 15px; transition: 0.3s;
         }
         
-        /* Menu Aktif */
         .menu-item.active a { background-color: white; color: black; }
         .menu-item:not(.active) a:hover { background-color: rgba(255, 255, 255, 0.1); }
         
         /* --- MAIN CONTENT --- */
         .main-content { flex: 1; display: flex; flex-direction: column; padding: 10px 20px; overflow: hidden; }
         
-        /* CSS UNTUK HEADER DAN TOMBOL HAPUS (DIUPDATE BIAR GAK GESER) */
+        /* HEADER & TOMBOL HAPUS */
         .header-action { 
             display: flex; justify-content: center; align-items: center; 
             margin-bottom: 30px; position: relative; width: 100%;
@@ -111,12 +110,13 @@ if (isset($_POST['tolak_submit'])) {
             letter-spacing: 1px; margin: 0; text-align: center;
         }
         .btn-hapus-all {
-            position: absolute; right: 10px; /* Bikin tombolnya ngambang di pojok kanan */
-            background-color: #ff4d4d; color: white; padding: 10px 20px; border-radius: 12px;
+            position: absolute; right: 10px;
+            background-color: #ff1a73; color: white; padding: 10px 20px; border-radius: 12px;
+            border: none; cursor: pointer;
             text-decoration: none; font-weight: 600; font-size: 14px; box-shadow: 0 4px 10px rgba(255, 77, 77, 0.3);
-            transition: 0.2s; display: flex; align-items: center; gap: 8px;
+            transition: 0.2s; display: flex; align-items: center; gap: 8px; font-family: 'Poppins', sans-serif;
         }
-        .btn-hapus-all:hover { background-color: #cc0000; transform: translateY(-2px); }
+        .btn-hapus-all:hover { background-color: #ff1a73; transform: translateY(-2px); }
 
         /* --- STYLING TABEL ANTRIAN --- */
         .table-container { flex: 1; overflow-y: auto; padding-right: 10px; }
@@ -136,19 +136,10 @@ if (isset($_POST['tolak_submit'])) {
         .col-status { font-weight: 700; text-transform: uppercase; font-size: 13px; }
         
         .action-buttons { display: flex; flex-direction: column; gap: 8px; align-items: center; justify-content: center; }
-        .btn-acc { background-color: #7dd3fc; color: white; border: none; padding: 6px 20px; border-radius: 20px; font-weight: 700; font-size: 12px; cursor: pointer; text-decoration: none; width: 80px; background: #6ede6e; transition: 0.2s;}
+        .btn-acc { background-color: #7dd3fc; color: white; border: none; padding: 6px 20px; border-radius: 20px; font-weight: 700; font-size: 12px; cursor: pointer; text-decoration: none; width: 80px; background: #6ede6e; transition: 0.2s; font-family: 'Poppins', sans-serif;}
         .btn-acc:hover { background: #5bc95b; }
-        .btn-tolak { background-color: #ff1a73; color: white; border: none; padding: 6px 20px; border-radius: 20px; font-weight: 700; font-size: 12px; cursor: pointer; text-decoration: none; width: 80px; transition: 0.2s;}
+        .btn-tolak { background-color: #ff1a73; color: white; border: none; padding: 6px 20px; border-radius: 20px; font-weight: 700; font-size: 12px; cursor: pointer; text-decoration: none; width: 80px; transition: 0.2s; font-family: 'Poppins', sans-serif;}
         .btn-tolak:hover { background: #e6005c; }
-        
-        .reject-form { background: white; padding: 25px; border-radius: 20px; border: 1px solid rgba(255, 26, 115, 0.15); margin-bottom: 25px; box-shadow: 0 10px 25px rgba(255, 26, 115, 0.08); }
-        .reject-form h3 { margin-bottom: 15px; color: #ff1a73; font-size: 20px; }
-        .reject-form textarea { width: 100%; min-height: 120px; border-radius: 15px; border: 1px solid #ddd; padding: 15px; resize: vertical; font-size: 14px; font-family: 'Poppins', sans-serif; margin-bottom: 15px; }
-        .reject-form textarea:focus { outline: none; border-color: #ff1a73; box-shadow: 0 0 0 4px rgba(255, 26, 115, 0.08); }
-        .reject-form .btn-submit { background-color: #ff1a73; color: white; border: none; padding: 12px 25px; border-radius: 18px; font-weight: 700; cursor: pointer; margin-right: 12px; }
-        .reject-form .btn-cancel { display: inline-block; color: #ff1a73; text-decoration: none; font-weight: 700; padding: 12px 25px; border-radius: 18px; border: 1px solid #ff1a73; }
-        .reject-form .btn-submit:hover { background: #e6005c; }
-        .reject-form .btn-cancel:hover { background: rgba(255, 26, 115, 0.08); }
         
         .sudah-diproses { font-style: italic; color: #777; font-size: 13px; }
 
@@ -192,23 +183,10 @@ if (isset($_POST['tolak_submit'])) {
     <div class="main-content">
         <div class="header-action">
             <h1 class="page-title">Antrian Permohonan</h1>
-            <a href="admin_antrian.php?aksi=hapus_riwayat" onclick="return confirm('Yakin mau hapus SEMUA riwayat yang udah Selesai & Ditolak? Data gak bisa balik lagi lho bos!');" class="btn-hapus-all">
+            <button onclick="hapusRiwayat()" class="btn-hapus-all">
                 🗑️ Bersihkan Riwayat
-            </a>
+            </button>
         </div>
-
-        <?php if ($show_reject_form && $reject_data) { ?>
-            <div class="reject-form">
-                <h3>Tolak Permohonan</h3>
-                <p style="margin-bottom: 15px; color: #444;">Silakan isi alasan penolakan untuk permohonan <strong><?php echo htmlspecialchars($reject_data['nama_aset']); ?></strong> oleh <strong><?php echo htmlspecialchars($reject_data['nama_peminjam']); ?></strong>.</p>
-                <form method="POST">
-                    <input type="hidden" name="id_pinjam" value="<?php echo $reject_data['id']; ?>">
-                    <textarea name="alasan_tolak" placeholder="Contoh: Waktu tidak tersedia, fasilitas sedang dalam perbaikan, atau peserta melebihi kapasitas" required><?php echo htmlspecialchars($reject_reasons[$reject_data['id']] ?? ''); ?></textarea>
-                    <button type="submit" name="tolak_submit" class="btn-submit">Kirim Penolakan</button>
-                    <a href="admin_antrian.php" class="btn-cancel">Batal</a>
-                </form>
-            </div>
-        <?php } ?>
 
         <div class="table-container">
             <table>
@@ -297,8 +275,8 @@ if (isset($_POST['tolak_submit'])) {
                         <td>
                             <?php if ($status_db == 'PENDING') { ?>
                                 <div class="action-buttons">
-                                    <a href="admin_antrian.php?aksi=acc&id_pinjam=<?php echo $data['id']; ?>" onclick="return confirm('ACC permohonan ini?')" class="btn-acc">ACC</a>
-                                    <a href="admin_antrian.php?aksi=tolak&id_pinjam=<?php echo $data['id']; ?>" onclick="return confirm('Tolak permohonan ini?')" class="btn-tolak">TOLAK</a>
+                                    <button onclick="accPermohonan(<?php echo $data['id']; ?>)" class="btn-acc">ACC</button>
+                                    <button onclick="tolakPermohonan(<?php echo $data['id']; ?>, '<?php echo addslashes(htmlspecialchars($data['nama_peminjam'])); ?>', '<?php echo addslashes(htmlspecialchars($data['nama_aset'])); ?>')" class="btn-tolak">TOLAK</button>
                                 </div>
                             <?php } else { ?>
                                 <span class="sudah-diproses">Sudah diproses</span>
@@ -316,5 +294,120 @@ if (isset($_POST['tolak_submit'])) {
         </div>
     </div>
 
+    <script>
+        // 1. Fungsi ACC
+        function accPermohonan(id) {
+            Swal.fire({
+                title: 'Setujui Permohonan?',
+                text: "Pastikan jadwal tidak bentrok ya bos!",
+                icon: 'question',
+                showCancelButton: true,
+                confirmButtonColor: '#6ede6e',
+                cancelButtonColor: '#888',
+                confirmButtonText: 'Ya, ACC!',
+                cancelButtonText: 'Batal',
+                heightAuto: false
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    fetch(`admin_antrian.php?ajax_action=acc&id_pinjam=${id}`)
+                    .then(res => res.json())
+                    .then(data => {
+                        if(data.status === 'success') {
+                            Swal.fire({
+                                title: 'Berhasil!', 
+                                text: data.pesan, 
+                                icon: 'success',
+                                heightAuto: false
+                            }).then(() => location.reload());
+                        }
+                    });
+                }
+            });
+        }
+
+        // 2. Fungsi Tolak (Dengan Form Input Langsung di Popup)
+        function tolakPermohonan(id, nama, aset) {
+            Swal.fire({
+                title: 'Tolak Permohonan',
+                html: `Silakan isi alasan penolakan untuk <b>${aset}</b> oleh <b>${nama}</b>.`,
+                input: 'textarea',
+                inputPlaceholder: 'Contoh: Waktu tidak tersedia, fasilitas sedang perbaikan...',
+                inputAttributes: {
+                    'aria-label': 'Tulis alasan penolakan'
+                },
+                showCancelButton: true,
+                confirmButtonColor: '#ff1a73',
+                cancelButtonColor: '#888',
+                confirmButtonText: 'Kirim Penolakan',
+                cancelButtonText: 'Batal',
+                heightAuto: false,
+                inputValidator: (value) => {
+                    if (!value) {
+                        return 'Alasan penolakan wajib diisi bos!'
+                    }
+                }
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    const formData = new FormData();
+                    formData.append('ajax_action', 'tolak');
+                    formData.append('id_pinjam', id);
+                    formData.append('alasan_tolak', result.value);
+
+                    fetch('admin_antrian.php', {
+                        method: 'POST',
+                        body: formData
+                    })
+                    .then(res => res.json())
+                    .then(data => {
+                        if(data.status === 'success') {
+                            Swal.fire({
+                                title: 'Ditolak!', 
+                                text: data.pesan, 
+                                icon: 'success',
+                                heightAuto: false
+                            }).then(() => location.reload());
+                        }
+                    });
+                }
+            });
+        }
+
+        // 3. Fungsi Hapus Riwayat
+        function hapusRiwayat() {
+            Swal.fire({
+                title: 'Yakin bersihin riwayat?',
+                text: "Data yang udah Selesai & Ditolak bakal dihapus permanen lho bos!",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#ff4d4d',
+                cancelButtonColor: '#888',
+                confirmButtonText: 'Ya, Sapu Bersih!',
+                cancelButtonText: 'Batal',
+                heightAuto: false
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    fetch('admin_antrian.php?ajax_action=hapus_riwayat')
+                    .then(res => res.json())
+                    .then(data => {
+                        if(data.status === 'success') {
+                            Swal.fire({
+                                title: 'Mantap!', 
+                                text: data.pesan, 
+                                icon: 'success',
+                                heightAuto: false
+                            }).then(() => location.reload());
+                        } else {
+                            Swal.fire({
+                                title: 'Gagal!', 
+                                text: data.pesan, 
+                                icon: 'error',
+                                heightAuto: false
+                            });
+                        }
+                    });
+                }
+            });
+        }
+    </script>
 </body>
 </html>
