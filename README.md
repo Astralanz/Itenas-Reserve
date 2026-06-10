@@ -32,3 +32,19 @@ Sistem reservasi fasilitas kampus Itenas berbasis web yang dibangun untuk memuda
 1. **Clone Repository:**
    ```bash
    git clone [https://github.com/username-lu/itenas-reserve.git](https://github.com/username-lu/itenas-reserve.git)
+
+## PEMBAGIAN TUGAS
+1. Pondasi awal/alur webnya termasuk backend : Rafli Maulana
+2. Bikin UI awal sebelum ke Frontend : Raka Muhammad 80%
+3. Bikin UI awal sebelum ke Frontend : Rafli Maulana 20%
+4. Implementasi Frontend : Rafli Maulana dan Raka Muhammad
+5. Fokus Implementasi lebih ke bagian reserve user/admin : Rafli Maulana
+6. Fokus Implementasi lebih ke bagian Waiting List user/admin : Raka Muhammad
+7. Fokus Implementasi lebih ke bagian rating user/admin : Rafli Maulana
+8. Database : Rafli Maulana
+9. Revisi customer service ganti ke wa di : Raka Muhammad
+10. Google auth login user: Raka Muhammad
+11. Google auth login admin / role admin : Rafli Maulana A
+12. Revisi bagian admin "bagian alasan penolakan" : Raka Muhammad
+13. Revisi bagian user "CEK" : Raka Muhammad
+14. Nambahin otomatis deteksi prodi berdasarkan kode dari akun google itenas semisal '15" yg langsung terdeteksi INFORMATIKA : Rafli Maulana

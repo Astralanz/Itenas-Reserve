@@ -1,9 +1,9 @@
-peminjaman-- phpMyAdmin SQL Dump
+-- phpMyAdmin SQL Dump
 -- version 5.2.1
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Waktu pembuatan: 29 Bulan Mei 2026 pada 04.49
+-- Waktu pembuatan: 10 Jun 2026 pada 17.23
 -- Versi server: 10.4.32-MariaDB
 -- Versi PHP: 8.2.12
 
@@ -38,10 +38,11 @@ CREATE TABLE `aset` (
 --
 
 INSERT INTO `aset` (`id`, `nama_aset`, `deskripsi`) VALUES
-(1, 'Lapangan Basket', 'Lapangan basket outdoor utama kampus'),
-(2, 'Ruang Aula', 'Aula serbaguna untuk seminar atau acara'),
-(3, 'ahayyy', 'Yang BU merapat'),
-(6, 'afdad', 'asdad');
+(2, 'Ruang Adu Nasib banget', 'Aula serbaguna untuk seminar atau acara'),
+(11, '201jt', '1234'),
+(12, 'dfsdfsdf', 'sdfsdf'),
+(13, 'sdfsdfsdf', 'sdfsdfs'),
+(14, 'sfsdfds', 'dfssdf');
 
 -- --------------------------------------------------------
 
@@ -68,38 +69,7 @@ CREATE TABLE `peminjaman` (
 --
 
 INSERT INTO `peminjaman` (`id`, `user_id`, `aset_id`, `nama_peminjam`, `nim`, `prodi`, `tanggal_pinjam`, `jam_mulai`, `jam_selesai`, `status`, `is_read`) VALUES
-(6, 1, 1, 'Astranjay', '152024078', 'Informatika', '2026-05-14', '13:15:00', '17:00:00', 'rejected', 0),
-(7, 1, 2, 'nihao', 'afasd', 'asdadas', '2026-05-20', '12:31:00', '12:31:00', 'selesai', 0),
-(8, 1, 1, 'afassafas', '1213213', 'asdadasd', '2026-05-15', '08:05:00', '09:05:00', 'selesai', 0),
-(9, 1, 2, 'aasdiadsh', '234234asdad', 'asdasdad', '2026-05-15', '10:22:00', '11:22:00', 'selesai', 0),
-(10, 1, 1, 'Astralanzs', 'afasd', 'Informatika', '2026-05-15', '20:06:00', '21:07:00', 'selesai', 0),
-(12, 3, 1, 'asdasd', 'asdasdaasda', 'asdadasd', '2026-05-15', '20:23:00', '20:29:00', 'selesai', 0),
-(13, 6, 1, 'Astranjay', '1213213', 'Informatika', '2026-05-15', '23:19:00', '15:19:00', 'selesai', 1),
-(14, 6, 2, 'Astralanzs', 'afasd', 'Informatika', '2026-05-15', '23:26:00', '23:32:00', 'selesai', 0),
-(15, 6, 1, 'Astranjay', 'afasd', 'Informatika', '2026-05-16', '00:06:00', '02:06:00', 'selesai', 0),
-(16, 6, 3, 'Astranjay', '1213213', 'Informatika', '2026-05-15', '00:07:00', '00:39:00', 'selesai', 0),
-(17, 6, 2, 'Astranjay', '1213213', 'asdadas', '2026-05-15', '04:12:00', '03:14:00', 'selesai', 0),
-(18, 6, 2, 'nihao', '1213213', 'Informatika', '2026-05-16', '15:19:00', '11:15:00', 'selesai', 0),
-(19, 7, 1, 'dadsad', 'asdasd', 'asdasd', '2026-05-21', '18:29:00', '18:33:00', 'selesai', 0),
-(20, 10, 1, 'Astranjay', '1213213', 'Informatika', '2026-05-21', '22:16:00', '15:18:00', 'selesai', 0),
-(21, 10, 1, 'Astranjay', '1213213', 'Informatika', '2026-05-21', '22:17:00', '14:21:00', 'selesai', 0),
-(22, 10, 1, 'Astranjay', '1213213', 'Informatika', '2026-05-21', '22:20:00', '14:25:00', 'selesai', 0),
-(23, 10, 1, 'Astranjay', 'afasd', 'asdadas', '2026-05-21', '22:24:00', '22:29:00', 'selesai', 0),
-(24, 10, 2, 'Astralanzs', '1213213', 'asdadas', '2026-05-21', '22:27:00', '22:33:00', 'selesai', 0),
-(27, 10, 3, 'Astralanzs', 'afasd', 'Informatika', '2026-05-21', '22:40:00', '23:40:00', 'selesai', 0),
-(29, 10, 1, 'Astralanzs', '1213213', 'Informatika', '2026-05-21', '23:00:00', '13:00:00', 'selesai', 0),
-(30, 10, 2, 'Astranjay', '1213213', 'Informatika', '2026-05-21', '23:01:00', '23:41:00', 'selesai', 0),
-(31, 10, 1, 'Astranjay', 'afasd', 'asdadas', '2026-05-21', '23:06:00', '23:08:00', 'selesai', 0),
-(33, 10, 1, 'Astranjay', '1213213', 'Informatika', '2026-05-21', '23:17:00', '23:19:00', 'selesai', 0),
-(34, 10, 2, 'Astralanzs', '1213213', 'asdasd', '2026-05-21', '23:18:00', '23:24:00', 'rejected', 0),
-(35, 10, 1, 'nihao', '234234asdad', 'Informatika', '2026-05-21', '23:44:00', '23:47:00', 'selesai', 0),
-(37, 10, 2, 'nihao', '1213213', 'Informatika', '2026-05-21', '23:46:00', '23:52:00', 'selesai', 0),
-(38, 10, 1, 'dfsdf', 'fsdfs', 'sfdsf', '2026-05-24', '22:35:00', '22:38:00', 'rejected', 0),
-(39, 10, 1, 'dfsf', 'sfsdf', 'sdfsdf', '2026-05-24', '22:42:00', '22:48:00', 'selesai', 0),
-(40, 10, 1, 'sdfsdf', 'sdfdsf', 'sdfsdfsd', '2026-05-24', '23:26:00', '23:30:00', 'selesai', 0),
-(41, 10, 1, 'asasd', 'asdasd', 'asdasd', '2026-05-24', '23:27:00', '23:33:00', 'rejected', 0),
-(42, 10, 1, 'rwgrwrgwgrw', '4rtwrgr', 'gdgegege', '2026-05-25', '13:32:00', '13:57:00', 'selesai', 0),
-(43, 10, 1, 'asfasdfawf', 'sdfasdfadf', 'asdfasdfsaddf', '2026-05-25', '16:27:00', '16:30:00', 'selesai', 0);
+(86, 10, 2, 'RAFLI MAULANA AHMAD', '152024078', 'Informatika', '2026-06-09', '13:00:00', '18:00:00', 'selesai', 0);
 
 -- --------------------------------------------------------
 
@@ -121,11 +91,16 @@ CREATE TABLE `rating` (
 --
 
 INSERT INTO `rating` (`id`, `email_user`, `nama_user`, `rating`, `komentar`, `tanggal`) VALUES
-(3, 'rafli.maulana@mhs.itenas.ac.id', '152024078 RAFLI MAULANA AHMAD', 4, 'test 11123', '2026-05-24 21:38:02'),
 (5, 'rafli.maulana@mhs.itenas.ac.id', '152024078 RAFLI MAULANA AHMAD', 4, 'cek', '2026-05-24 21:47:18'),
 (6, 'rafli.maulana@mhs.itenas.ac.id', '152024078 RAFLI MAULANA AHMAD', 1, 'P gelud?', '2026-05-24 23:31:06'),
 (7, 'rafli.maulana@mhs.itenas.ac.id', '152024078 RAFLI MAULANA AHMAD', 5, 'sadasd', '2026-05-24 23:32:17'),
-(8, 'rafli.maulana@mhs.itenas.ac.id', '152024078 RAFLI MAULANA AHMAD', 3, 'hahayy', '2026-05-25 00:45:39');
+(8, 'rafli.maulana@mhs.itenas.ac.id', '152024078 RAFLI MAULANA AHMAD', 3, 'hahayy', '2026-05-25 00:45:39'),
+(10, 'rafli.maulana@mhs.itenas.ac.id', '152024078 RAFLI MAULANA AHMAD', 3, 'Test', '2026-05-29 10:19:00'),
+(11, 'rafli.maulana@mhs.itenas.ac.id', '152024078 RAFLI MAULANA AHMAD', 1, 'halo\r\n', '2026-05-29 13:43:33'),
+(12, 'rafli.maulana@mhs.itenas.ac.id', 'Rafli Maulana', 5, 'Ulasan Sementara', '2026-05-29 21:21:00'),
+(13, 'rafli.maulana@mhs.itenas.ac.id', 'Rafli Maulana', 5, 'Ulasan Sementara', '2026-05-29 21:23:07'),
+(14, 'rafli.maulana@mhs.itenas.ac.id', 'Rafli Maulana', 5, 'Ulasan Sementara', '2026-05-29 21:23:40'),
+(15, 'rafli.maulana@mhs.itenas.ac.id', '152024078 RAFLI MAULANA AHMAD', 1, 'gdfgfgd', '2026-05-29 22:01:06');
 
 -- --------------------------------------------------------
 
@@ -154,7 +129,8 @@ INSERT INTO `users` (`id`, `email`, `role`, `foto_profil`) VALUES
 (7, 'astra@itenas.ac.id', 'user', NULL),
 (8, 'rafli.maulana@itenas.ac.id', 'user', NULL),
 (9, 'astra@mhs.itenas.ac.id', 'user', NULL),
-(10, 'rafli.maulana@mhs.itenas.ac.id', 'user', '6a132ff92cce0.webp');
+(10, 'rafli.maulana@mhs.itenas.ac.id', 'user', '6a278f0a359a2.jpg'),
+(11, 'rmaulanaahmad45@gmail.com', 'admin', NULL);
 
 --
 -- Indexes for dumped tables
@@ -195,25 +171,25 @@ ALTER TABLE `users`
 -- AUTO_INCREMENT untuk tabel `aset`
 --
 ALTER TABLE `aset`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=15;
 
 --
 -- AUTO_INCREMENT untuk tabel `peminjaman`
 --
 ALTER TABLE `peminjaman`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=44;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=96;
 
 --
 -- AUTO_INCREMENT untuk tabel `rating`
 --
 ALTER TABLE `rating`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=18;
 
 --
 -- AUTO_INCREMENT untuk tabel `users`
 --
 ALTER TABLE `users`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=11;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=12;
 
 --
 -- Ketidakleluasaan untuk tabel pelimpahan (Dumped Tables)
